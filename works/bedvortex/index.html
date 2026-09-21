@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>床 · 漩涡 — BedVortex</title>
+<!--
+  原作: NyanCatHypnotic by thenumbernine (https://www.shadertoy.com/view/Msl3WM, CC BY-NC-SA 3.0)
+  本页: 用 three.js 渲染 3D 床模型(bed.glb)到纹理, 再经原版漩涡合成管线
+  (扰动 + 彩虹染色 + 四色调色板背景)合成, 旧版羊群见 flock.html
+-->
+<style>
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    background: #000; overflow: hidden;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  #glcanvas { touch-action: none; cursor: grab; position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  #hud {
+    position: absolute; left: 14px; bottom: 12px;
+    color: rgba(255,255,255,.75); font-size: 12px; line-height: 1.7;
+    text-shadow: 0 1px 2px rgba(0,0,0,.8);
+    user-select: none; pointer-events: none;
+  }
+  #hud a { color: rgba(255,255,255,.9); }
+  #hud .title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
+  #fps {
+    position: absolute; right: 14px; top: 10px;
+    color: rgba(255,255,255,.65); font-size: 12px;
+    text-shadow: 0 1px 2px rgba(0,0,0,.8); user-select: none; pointer-events: none;
+  }
+  #panelToggle {
+    position: absolute; right: 14px; bottom: 12px;
+    background: rgba(20,20,24,.72); color: rgba(255,255,255,.85);
+    border: 1px solid rgba(255,255,255,.22); border-radius: 8px;
+    padding: 6px 12px; font: 12px/1 inherit; cursor: pointer;
+    backdrop-filter: blur(4px);
+  }
+  #panelToggle:hover { background: rgba(40,40,48,.85); }
+  #panel {
+    position: absolute; right: 14px; bottom: 48px; width: 250px;
+    max-height: min(74vh, 520px); overflow-y: auto;
+    background: rgba(16,16,20,.82); border: 1px solid rgba(255,255,255,.18);
+    border-radius: 10px; padding: 10px 14px 12px;
+    color: rgba(255,255,255,.88); font-size: 12px;
+    backdrop-filter: blur(6px); user-select: none;
+  }
+  #panel.hidden { display: none; }
+  #panel .p-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-weight: 700; font-size: 13px; margin-bottom: 6px;
+  }
+  #panel .p-head button {
+    background: none; border: 1px solid rgba(255,255,255,.25); border-radius: 6px;
+    color: rgba(255,255,255,.75); font: 11px/1 inherit; padding: 4px 8px; cursor: pointer;
+  }
+  #panel .p-head button:hover { color: #fff; border-color: rgba(255,255,255,.5); }
+  #panel .row { margin: 7px 0 2px; }
+  #panel .row .lab { display: flex; justify-content: space-between; margin-bottom: 2px; }
+  #panel .row .lab .val { color: rgba(255,255,255,.55); font-variant-numeric: tabular-nums; }
+  #panel input[type="range"] {
+    width: 100%; height: 18px; margin: 0; cursor: pointer;
+    -webkit-appearance: none; appearance: none; background: transparent;
+  }
+  #panel input[type="range"]::-webkit-slider-runnable-track {
+    height: 4px; border-radius: 2px; background: rgba(255,255,255,.25);
+  }
+  #panel input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none; appearance: none;
+    width: 12px; height: 12px; border-radius: 50%; margin-top: -4px;
+    background: #ff9aff; border: 1px solid rgba(0,0,0,.4);
+  }
+  #panel input[type="range"]::-moz-range-track {
+    height: 4px; border-radius: 2px; background: rgba(255,255,255,.25);
+  }
+  #panel input[type="range"]::-moz-range-thumb {
+    width: 11px; height: 11px; border-radius: 50%;
+    background: #ff9aff; border: 1px solid rgba(0,0,0,.4);
+  }
+  #panel .group {
+    margin: 12px 0 2px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,.14);
+    color: rgba(255,154,255,.8); font-size: 11px; letter-spacing: 2px;
+  }
+  #panel .imgs { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 4px; }
+  #panel .bgbtn {
+    background: rgba(255,255,255,.08); color: rgba(255,255,255,.8);
+    border: 1px solid rgba(255,255,255,.18); border-radius: 6px;
+    font: 11px/1 inherit; padding: 4px 8px; cursor: pointer;
+  }
+  #panel .bgbtn:hover { background: rgba(255,255,255,.16); }
+  #panel .bgbtn.on { background: rgba(255,154,255,.35); border-color: rgba(255,154,255,.7); color: #fff; }
+  #panel .palwrap { margin: 6px 0 2px; }
+  #panel .palrow { display: flex; gap: 6px; margin: 6px 0 4px; }
+  #panel .palrow input[type="color"] {
+    -webkit-appearance: none; appearance: none;
+    width: 30px; height: 24px; padding: 0; border: 1px solid rgba(255,255,255,.25);
+    border-radius: 5px; background: none; cursor: pointer;
+  }
+  #panel .palrow input[type="color"]::-webkit-color-swatch-wrapper { padding: 2px; }
+  #panel .palrow input[type="color"]::-webkit-color-swatch { border: none; border-radius: 3px; }
+  #panel .palhint { color: rgba(255,255,255,.4); font-size: 10px; }
+  #loading {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: rgba(255,255,255,.8); font-size: 14px; background: #000;
+    transition: opacity .4s; pointer-events: none;
+  }
+  #loading.hidden { opacity: 0; }
+  #err {
+    position: absolute; inset: auto 14px 44px 14px; display: none;
+    color: #ff6b6b; font-size: 12px; white-space: pre-wrap;
+    text-shadow: 0 1px 2px rgba(0,0,0,.9);
+  }
+</style>
+</head>
+<body>
+<canvas id="glcanvas"></canvas>
+
+<div id="hud">
+  <div class="title">BedVortex · 床与漩涡</div>
+  <div>基于 <a href="https://www.shadertoy.com/view/Msl3WM" target="_blank">NyanCatHypnotic</a> · <a href="flock.html">羊群版 →</a></div>
+  <div>按住不动进入梦境 · 拖动搅动漩涡 · 双指上下滑动推拉镜头 · 双击复位</div>
+  <div>视图 <span id="viewZoom">1.00×</span> · 空格 暂停 · R 重置 · F 全屏</div>
+</div>
+<div id="dreamStatus" style="position:absolute;top:24px;left:50%;transform:translateX(-50%);color:#fff;font:13px sans-serif;pointer-events:none;text-shadow:0 2px 8px #000"></div>
+<div id="fps"></div>
+<input type="file" id="bgFile" accept="image/*" hidden>
+<button id="panelToggle">⚙ 参数</button>
+<div id="panel">
+  <div class="p-head"><span>参数</span><button id="panelReset">重置</button></div>
+  <div id="panelBody"></div>
+</div>
+<div id="loading">加载床模型中…</div>
+<div id="err"></div>
+
+<!-- 漩涡合成着色器(three ShaderMaterial, GLSL1) -->
+<script type="text/plain" id="composite">
+precision highp float;
+
+uniform vec3  iResolution;
+uniform float iTime;
+uniform sampler2D iChannel0; // 漩涡背景图(512×512, 可换)
+uniform sampler2D uBedTex;   // 床渲染目标(透明背景)
+
+uniform float uBgScale, uBgRot, uBgBright, uBgSat, uBgTint;
+uniform vec3  uPalA, uPalB, uPalC, uPalD;
+uniform float uPalMode;
+uniform float uWarpAmt, uWarpSpd, uWarpFreq;
+uniform float uDreamPhase, uGestureTwist;
+
+varying vec2 vPos; // [0,1]², y 向上
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+	float time = iTime;
+
+	vec2 pos = fragCoord / iResolution.xy;
+	pos -= .5;
+	pos *= 1.3;
+	pos += .5;
+
+	vec2 dx = pos - .5;
+	float r = dot(dx,dx);
+	float phase = time * 5. + r * 15.;
+
+	vec3 lerps;
+	lerps.r = cos(phase) * .5 + .5;
+	lerps.g = cos(phase - 2.0943951023932) * .5 + .5;
+	lerps.b = cos(phase - 4.1887902047864) * .5 + .5;
+
+	// 原版彩虹扰动(床与背景共用, 像原来的猫)
+	vec2 lookup = pos;
+	lookup.x += (2. * lerps.g - 1.) * .05;
+	lookup.y -= (2. * lerps.b - 1.) * .05;
+
+	// 床(渲染目标, 透明背景; RT 为线性颜色, 这里做 gamma 校正显示)
+	vec4 bed = texture2D( uBedTex, lookup );
+	bed.rgb = pow( bed.rgb, vec3(0.4545) );
+
+	// 背景: 独立扭曲 + 缩放 + 旋转 + 亮度/饱和度 + 四色调色板
+	float wphase = time * 5. * uWarpSpd + uDreamPhase + r * uWarpFreq;
+	vec3 wl;
+	wl.r = cos(wphase) * .5 + .5;
+	wl.g = cos(wphase - 2.0943951023932) * .5 + .5;
+	wl.b = cos(wphase - 4.1887902047864) * .5 + .5;
+	vec2 bwarp = pos;
+	bwarp.x += (2. * wl.g - 1.) * uWarpAmt;
+	bwarp.y -= (2. * wl.b - 1.) * uWarpAmt;
+	vec2 swirl = bwarp - 0.5;
+  float gestureAngle = uGestureTwist * exp(-r * 3.0);
+  swirl = mat2(cos(gestureAngle), -sin(gestureAngle), sin(gestureAngle), cos(gestureAngle)) * swirl;
+  vec2 buv = swirl * uBgScale;
+	float ba = uBgRot * time;
+	buv = mat2( cos(ba), -sin(ba), sin(ba), cos(ba) ) * buv + 0.5;
+	vec4 bg = texture2D( iChannel0, buv );
+	float bl = dot( bg.rgb, vec3(0.299,0.587,0.114) );
+	bg.rgb = mix( vec3(bl), bg.rgb, uBgSat ) * uBgBright;
+	float asp = iResolution.x / iResolution.y;
+	float palT = mix( 1.0 - pos.y, clamp( length( (pos - 0.5) * vec2(asp, 1.0) ) * 1.7, 0.0, 1.0 ), uPalMode );
+	vec3 tc = mix( uPalA, uPalB, smoothstep(0.0, 0.3333, palT) );
+	tc = mix( tc, uPalC, smoothstep(0.3333, 0.6667, palT) );
+	tc = mix( tc, uPalD, smoothstep(0.6667, 1.0, palT) );
+	bg.rgb = mix( bg.rgb, bl * 2.0 * tc, uBgTint );
+
+	// 床叠在漩涡上
+	vec4 color;
+	color.rgb = bed.rgb * bed.a + (1.0 - bed.a) * bg.rgb;
+	color.a = 1.0;
+
+	// 原版彩虹点积调色
+	fragColor.r = .75 * dot(color.rgb, lerps.rgb);
+	fragColor.g = .75 * dot(color.rgb, lerps.brg);
+	fragColor.b = .75 * dot(color.rgb, lerps.gbr);
+	fragColor.a = 1.0;
+}
+
+void main() { mainImage( gl_FragColor, vPos * iResolution.xy ); }
+</script>
+
+<script type="importmap">
+{ "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/" } }
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const canvas = document.getElementById("glcanvas");
+const errBox = document.getElementById("err");
+function fatal(msg) {
+  errBox.style.display = "block";
+  errBox.textContent = msg;
+  document.getElementById("loading").classList.add("hidden");
+}
+
+// ---------- 参数 ----------
+const DEFAULTS = {
+  bedSize: 1.1, bedSpin: 0.5, bedTilt: 0, bedBob: 0,
+  bedTwist: 0, bedTwistSpd: 0.8, pillowFloat: 0.08, duvetFloat: 0.16,
+  bedBend: 0.05, bedBendSpd: 0.4,
+  bgScale: 1, bgRot: 0, bgBright: 1, bgSat: 1,
+  palA: "#4a63e8", palB: "#7a52e8", palC: "#b04be8", palD: "#e84bc0",
+  palMode: 0, bgTint: 0.85,
+  warpAmt: 0.05, warpSpd: 1, warpFreq: 15,
+};
+const params = { ...DEFAULTS };
+try { Object.assign(params, JSON.parse(localStorage.getItem("bedParams9") || "{}")); } catch (e) { /* 忽略损坏存档 */ }
+function saveParams() {
+  try { localStorage.setItem("bedParams9", JSON.stringify(params)); } catch (e) { /* 隐私模式 */ }
+}
+
+// ---------- 渲染器 / 场景 ----------
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, preserveDrawingBuffer: true });
+renderer.setClearColor(0x000000, 0);
+renderer.autoClear = false;
+
+const scene = new THREE.Scene();
+// 中俯角机位(约 36°, 对齐参考视频): 展示视角, 床平放缓慢转台自转
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 50);
+camera.position.set(0, 3.0, 4.2);
+camera.up.set(0, 1, 0);
+camera.lookAt(0, -0.2, 0);
+
+// 环境光照(PBR 材质需要) + 主光
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.6);
+keyLight.position.set(2, 5, 3);
+scene.add(keyLight);
+
+// 床变形: 3D扭曲(平面涡旋) + 柔性起伏(床面一侧缓缓隆起, 顶点级表现立体感, 无刚体旋转)
+// opts.wave 给被子额外加边缘飘动。所有位移只沿 +y(朝镜头方向), 床面法线永不背向摄像机
+const twistU = { uTwist: { value: params.bedTwist }, uTwistTime: { value: 0 } };
+const waveU = { uWaveAmp: { value: params.duvetFloat }, uWaveTime: { value: 0 }, uDuvetC: { value: new THREE.Vector3() } };
+const bendU = { uBend: { value: params.bedBend }, uBendTime: { value: 0 }, uBedC: { value: new THREE.Vector3() } };
+function patchTwist(mat, opts = {}) {
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTwist = twistU.uTwist;
+    shader.uniforms.uTwistTime = twistU.uTwistTime;
+    shader.uniforms.uBend = bendU.uBend;
+    shader.uniforms.uBendTime = bendU.uBendTime;
+    shader.uniforms.uBedC = bendU.uBedC;
+    let decl = "uniform float uTwist;\nuniform float uTwistTime;\nuniform float uBend;\nuniform float uBendTime;\nuniform vec3 uBedC;\n";
+    let inject = `#include <begin_vertex>
+    {
+      // 绕床面法线(局部 z, 即世界竖轴)的涡旋扭曲, 强度随离床面高度衰减 —— 不会翻转床面
+      float ang = uTwist * sin(uTwistTime) * (transformed.z - uBedC.z) * 1.2;
+      float c = cos(ang), s = sin(ang);
+      transformed.xy = mat2(c, -s, s, c) * transformed.xy;
+      // 柔性起伏: 沿床面法线(局部 z)的行进波 + 抛物隆起, 一侧抬高另一侧沉降
+      vec3 bp = transformed - uBedC;
+      transformed.z += uBend * ( sin(uBendTime + bp.x * 1.1) * 0.30
+        + sin(uBendTime * 0.71 + bp.y * 1.3) * 0.30
+        + (bp.x * bp.x * 0.10 + bp.y * bp.y * 0.08) * sin(uBendTime * 0.5) );
+    }`;
+    if (opts.wave) {
+      shader.uniforms.uWaveAmp = waveU.uWaveAmp;
+      shader.uniforms.uWaveTime = waveU.uWaveTime;
+      shader.uniforms.uDuvetC = waveU.uDuvetC;
+      decl += "uniform float uWaveAmp;\nuniform float uWaveTime;\nuniform vec3 uDuvetC;\n";
+      inject += `
+    {
+      vec3 dp = transformed - uDuvetC;
+      float edge = clamp(length(dp.xy) * 0.55, 0.0, 1.0);
+      transformed.z += uWaveAmp * edge * ( sin(uWaveTime + dp.x * 2.2) * 0.6
+        + sin(uWaveTime * 1.37 + dp.y * 1.8 + 1.7) * 0.5
+        + sin(uWaveTime * 0.71 + (dp.x + dp.y) * 1.2) * 0.4 );
+      transformed.z += uWaveAmp * 0.5 * edge * edge * sin(uWaveTime * 0.8 + dp.x * 0.8);
+    }`;
+    }
+    shader.vertexShader = decl + shader.vertexShader.replace("#include <begin_vertex>", inject);
+  };
+}
+
+// ---------- 程序化材质贴图(参考图: 深胡桃木架 + 冷白亚麻床品) ----------
+function makeNoise(seed) {
+  let s = seed;
+  return () => (s = (s * 16807) % 2147483647) / 2147483647;
+}
+function makeCanvas(w, h, draw) {
+  const c = document.createElement("canvas");
+  c.width = w; c.height = h;
+  draw(c.getContext("2d"), w, h);
+  return c;
+}
+// 亚麻布纹(冷白)
+const linenCanvas = makeCanvas(256, 256, (g, W, H) => {
+  const img = g.createImageData(W, H);
+  const rnd = makeNoise(11);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const weave = ((x >> 1) + (y >> 1)) % 2 === 0 ? 5 : -3;
+    const blotch = 3 * Math.sin(x * 0.045 + Math.cos(y * 0.03) * 2) * Math.cos(y * 0.05);
+    const v = 238 + weave + blotch + (rnd() - 0.5) * 5;
+    img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v - 2; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+});
+// 布纹凹凸(高频织纹)
+const linenBumpCanvas = makeCanvas(256, 256, (g, W, H) => {
+  const img = g.createImageData(W, H);
+  const rnd = makeNoise(23);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const weave = ((x >> 1) + (y >> 1)) % 2 === 0 ? 26 : -26;
+    const v = 128 + weave + (rnd() - 0.5) * 22;
+    img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+});
+// 深胡桃木纹
+const woodCanvas = makeCanvas(256, 256, (g, W, H) => {
+  const img = g.createImageData(W, H);
+  const rnd = makeNoise(37);
+  const grainOff = [];
+  for (let y = 0; y < H; y++) grainOff.push(Math.sin(y * 0.09) * 5 + (rnd() - 0.5) * 3);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const t = x * 0.16 + grainOff[y];
+    const stripe = Math.sin(t) * 0.5 + Math.sin(t * 0.37 + y * 0.01) * 0.5;
+    const k = 0.5 + 0.5 * stripe;                    // 0..1 木纹明暗
+    const r = 62 + k * 48 + (rnd() - 0.5) * 7;
+    const gg = 50 + k * 38 + (rnd() - 0.5) * 6;
+    const b = 42 + k * 30 + (rnd() - 0.5) * 5;
+    img.data[i] = r; img.data[i + 1] = gg; img.data[i + 2] = b; img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+});
+// 床垫条纹布(米白 + 淡灰蓝细条纹)
+const tickCanvas = makeCanvas(256, 256, (g, W, H) => {
+  const img = g.createImageData(W, H);
+  const rnd = makeNoise(53);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const i = (y * W + x) * 4;
+    const stripe = (x % 24) < 3 ? -22 : (x % 24) < 5 ? -10 : 0;
+    const v = 240 + stripe + (rnd() - 0.5) * 5;
+    img.data[i] = v; img.data[i + 1] = v; img.data[i + 2] = v - 1 - (stripe < 0 ? 5 : 0); img.data[i + 3] = 255;
+  }
+  g.putImageData(img, 0, 0);
+});
+function makeTex(canvas, srgb, rx, ry) {
+  const t = new THREE.CanvasTexture(canvas);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(rx, ry);
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return t;
+}
+// 缺 UV 的网格按包围盒补平面 UV
+function ensureUV(o) {
+  const geo = o.geometry;
+  if (geo.attributes.uv) return;
+  geo.computeBoundingBox();
+  const b = geo.boundingBox, size = new THREE.Vector3();
+  b.getSize(size);
+  const pos = geo.attributes.position;
+  const uv = new Float32Array(pos.count * 2);
+  const useXZ = size.y <= size.x && size.y <= size.z;
+  const ax = Math.max(useXZ ? size.x : size.x, 0.001);
+  const a2 = Math.max(useXZ ? size.z : size.y, 0.001);
+  for (let i = 0; i < pos.count; i++) {
+    const px = pos.getX(i) - b.min.x, py = pos.getY(i) - b.min.y, pz = pos.getZ(i) - b.min.z;
+    uv[i * 2] = px / ax;
+    uv[i * 2 + 1] = (useXZ ? pz : py) / a2;
+  }
+  geo.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
+}
+function applyBedTextures(root) {
+  const linenMap = makeTex(linenCanvas, true, 2.5, 2.5);
+  const linenBump = makeTex(linenBumpCanvas, false, 2.5, 2.5);
+  const woodMap = makeTex(woodCanvas, true, 1.5, 1.5);
+  const woodBump = makeTex(woodCanvas, false, 1.5, 1.5);
+  const tickMap = makeTex(tickCanvas, true, 2, 2);
+  // 先收集"被顶点色网格使用的材质"(材质会跨网格共享, 需整体跳过以免覆盖模型自带配色)
+  const coloredMats = new Set();
+  root.traverse((o) => {
+    if (o.isMesh && o.geometry && o.geometry.attributes.color) {
+      (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => coloredMats.add(m));
+    }
+  });
+  if (coloredMats.size > 0) return;   // 模型自带完整配色(如漫画版): 完全尊重, 不加程序化贴图
+  root.traverse((o) => {
+    if (!o.isMesh || !o.material) return;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    if (o.geometry && o.geometry.attributes.color) return;   // 顶点色网格: 保留原配色
+    if (mats.some((m) => coloredMats.has(m))) return;        // 共享材质已被顶点色使用: 同样保留
+    ensureUV(o);
+    for (const m of mats) {
+      const n = (m.name || "").toLowerCase();
+      if (n.includes("oak")) {
+        m.map = woodMap; m.bumpMap = woodBump; m.bumpScale = 0.4; m.roughness = 0.6;
+      } else if (n.includes("ticking")) {
+        m.map = tickMap; m.bumpMap = linenBump; m.bumpScale = 0.15; m.roughness = 0.85;
+      } else {
+        m.map = linenMap; m.bumpMap = linenBump; m.bumpScale = 0.2; m.roughness = 0.92;
+      }
+      m.color.set(0xffffff);
+      m.needsUpdate = true;
+    }
+  });
+}
+
+// ---------- 床模型 ----------
+let bed = null;
+let bedTilt = null, bedSpinG = null;
+let bedBaseScale = 1;
+let pillows = [], duvetMesh = null;
+const bedState = { spin: 0.6 };   // 绕床面法线(厚度轴)的自转角
+window.__bedReady = false;
+new GLTFLoader().load("bed.glb?v=2", (gltf) => {
+  const model = gltf.scene;
+  // 居中并归一化尺寸
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  bedBaseScale = 1.9 / Math.max(size.x, size.y, size.z);
+  // 模型原始朝向: 床面法线为 +Z, 床长沿 Y —— 先绕 X 转 -90° 让床面朝上(+Y)、床水平
+  const orient = new THREE.Group();
+  orient.rotation.x = -Math.PI / 2;
+  orient.add(model);
+  model.position.sub(center);
+  bendU.uBedC.value.copy(center);   // 柔性起伏的床面中心(模型坐标系)
+  // 层级: wrap(位置/缩放) → 倾斜组(床面法线朝镜头倾角) → 自旋组(绕法线/厚度轴旋转) → orient → 模型
+  const spinG = new THREE.Group();
+  spinG.add(orient);
+  const tiltG = new THREE.Group();
+  tiltG.rotation.x = params.bedTilt;
+  tiltG.add(spinG);
+  const wrap = new THREE.Group();
+  wrap.add(tiltG);
+  wrap.scale.setScalar(bedBaseScale);
+  scene.add(wrap);
+  bed = wrap;
+  bedTilt = tiltG;
+  bedSpinG = spinG;
+
+  applyBedTextures(model);
+
+  // 分类: 枕头/被子独立漂浮
+  model.traverse((o) => {
+    if (!o.isMesh) return;
+    const n = (o.name || "").toLowerCase();
+    if (n.includes("pillow")) {
+      pillows.push(o);
+      o.userData.bx = o.position.x; o.userData.by = o.position.y; o.userData.bz = o.position.z;
+      o.userData.brx = o.rotation.x; o.userData.bry = o.rotation.y; o.userData.brz = o.rotation.z;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => patchTwist(m));
+    } else if (n.includes("duvet")) {
+      duvetMesh = o;
+      o.userData.bx = o.position.x; o.userData.by = o.position.y; o.userData.bz = o.position.z;
+      o.userData.brx = o.rotation.x; o.userData.bry = o.rotation.y; o.userData.brz = o.rotation.z;
+      o.geometry.computeBoundingBox();
+      waveU.uDuvetC.value.copy(o.geometry.boundingBox.getCenter(new THREE.Vector3()));
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => patchTwist(m, { wave: true }));
+    } else {
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => patchTwist(m));
+    }
+  });
+  window.__bedReady = true;
+  window.__orient = function () {
+    const out = [];
+    model.updateWorldMatrix(true, true);
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const b = new THREE.Box3().setFromObject(o);
+      const c = b.getCenter(new THREE.Vector3());
+      const s = b.getSize(new THREE.Vector3());
+      out.push({ name: o.name, cx: +c.x.toFixed(2), cy: +c.y.toFixed(2), cz: +c.z.toFixed(2), sx: +s.x.toFixed(2), sy: +s.y.toFixed(2), sz: +s.z.toFixed(2) });
+    });
+    return out;
+  };
+  window.__bedInfo = function () {
+    let maps = 0, withMap = 0, uvMissing = 0;
+    model.traverse((o) => {
+      if (!o.isMesh) return;
+      const mats = Array.isArray(o.material) ? o.material : [o.material];
+      mats.forEach((m) => { maps++; if (m.map) withMap++; });
+      if (!o.geometry.attributes.uv) uvMissing++;
+    });
+    return { pillows: pillows.length, hasDuvet: !!duvetMesh, maps: withMap + "/" + maps, uvMissing };
+  };
+  document.getElementById("loading").classList.add("hidden");
+}, undefined, (e) => fatal("床模型加载失败: " + e.message));
+
+// ---------- 背景贴图(512×512 画布, 可切换/上传) ----------
+let bgImage = null;
+const bgCanvas = document.createElement("canvas");
+bgCanvas.width = 512; bgCanvas.height = 512;
+const bgCtx = bgCanvas.getContext("2d");
+function drawCover(source) {
+  const w = source.naturalWidth || source.width, h = source.naturalHeight || source.height;
+  const s = Math.max(512 / w, 512 / h);
+  bgCtx.clearRect(0, 0, 512, 512);
+  bgCtx.drawImage(source, (512 - w * s) / 2, (512 - h * s) / 2, w * s, h * s);
+}
+const bgTexture = new THREE.CanvasTexture(bgCanvas);
+bgTexture.wrapS = bgTexture.wrapT = THREE.RepeatWrapping;
+bgTexture.minFilter = THREE.LinearMipmapLinearFilter;
+bgTexture.colorSpace = THREE.NoColorSpace; // 原始字节, 与旧版一致
+
+new THREE.ImageLoader().load("background-stars.png", (img) => {
+  bgImage = img;
+  drawCover(img);
+  bgTexture.needsUpdate = true;
+});
+
+function presetCanvas(draw) {
+  const c = document.createElement("canvas");
+  c.width = 512; c.height = 512;
+  draw(c.getContext("2d"));
+  return c;
+}
+const BG_PRESETS = {
+  "漩涡": () => bgImage,
+  "纯色": () => presetCanvas((g) => { g.fillStyle = "#23232a"; g.fillRect(0, 0, 512, 512); }),
+  "彩虹": () => presetCanvas((g) => {
+    const gr = g.createLinearGradient(0, 0, 512, 512);
+    for (let i = 0; i <= 6; i++) gr.addColorStop(i / 6, "hsl(" + Math.round(i * 60) + ",80%,55%)");
+    g.fillStyle = gr; g.fillRect(0, 0, 512, 512);
+  }),
+  "网格": () => presetCanvas((g) => {
+    g.fillStyle = "#101014"; g.fillRect(0, 0, 512, 512);
+    g.strokeStyle = "rgba(255,255,255,.5)"; g.lineWidth = 2;
+    for (let i = 0; i <= 512; i += 64) {
+      g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 512); g.stroke();
+      g.beginPath(); g.moveTo(0, i); g.lineTo(512, i); g.stroke();
+    }
+  }),
+  "星空": () => presetCanvas((g) => {
+    g.fillStyle = "#0a0a12"; g.fillRect(0, 0, 512, 512);
+    let seed = 42;
+    const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+    for (let i = 0; i < 260; i++) {
+      const x = rnd() * 512, y = rnd() * 512, r = rnd() * 1.6 + 0.4;
+      const b = Math.round(120 + rnd() * 135);
+      g.fillStyle = "rgba(" + b + "," + b + "," + (b + 20) + "," + (0.4 + rnd() * 0.6).toFixed(2) + ")";
+      g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+    }
+  }),
+};
+function setBgTexture(source) {
+  if (!source) return;
+  drawCover(source);
+  bgTexture.needsUpdate = true;
+}
+function useImageFile(f) {
+  if (!f || !f.type.startsWith("image/")) return;
+  const url = URL.createObjectURL(f);
+  new THREE.ImageLoader().load(url, (img) => { setBgTexture(img); URL.revokeObjectURL(url); });
+}
+document.getElementById("bgFile").addEventListener("change", (e) => useImageFile(e.target.files && e.target.files[0]));
+window.addEventListener("dragover", (e) => e.preventDefault());
+window.addEventListener("drop", (e) => { e.preventDefault(); useImageFile(e.dataTransfer.files && e.dataTransfer.files[0]); });
+
+// ---------- 床渲染目标 + 合成全屏三角形 ----------
+let bedRT = new THREE.WebGLRenderTarget(2, 2, { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, format: THREE.RGBAFormat });
+
+const compScene = new THREE.Scene();
+const compCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+const compUniforms = {
+  iResolution: { value: new THREE.Vector3(1, 1, 1) },
+  iTime: { value: 0 },
+  iChannel0: { value: bgTexture },
+  uBedTex: { value: bedRT.texture },
+  uBgScale: { value: params.bgScale },
+  uBgRot: { value: params.bgRot },
+  uBgBright: { value: params.bgBright },
+  uBgSat: { value: params.bgSat },
+  uBgTint: { value: params.bgTint },
+  uPalA: { value: new THREE.Color(params.palA) },
+  uPalB: { value: new THREE.Color(params.palB) },
+  uPalC: { value: new THREE.Color(params.palC) },
+  uPalD: { value: new THREE.Color(params.palD) },
+  uPalMode: { value: params.palMode },
+  uWarpAmt: { value: params.warpAmt },
+  uWarpSpd: { value: params.warpSpd },
+  uWarpFreq: { value: params.warpFreq },
+  uDreamPhase: { value: 0 },
+  uGestureTwist: { value: 0 },
+};
+const compMat = new THREE.ShaderMaterial({
+  uniforms: compUniforms,
+  vertexShader: "varying vec2 vPos; void main(){ vPos = position.xy * 0.5 + 0.5; gl_Position = vec4(position.xy, 0.0, 1.0); }",
+  fragmentShader: document.getElementById("composite").textContent,
+  depthTest: false, depthWrite: false,
+});
+const triGeom = new THREE.BufferGeometry();
+triGeom.setAttribute("position", new THREE.BufferAttribute(new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]), 3));
+compScene.add(new THREE.Mesh(triGeom, compMat));
+
+// ---------- 摄影机环绕 ----------
+const orbitHome = { yaw: 0, pitch: Math.atan2(3.2, 4.2), radius: Math.hypot(3.2, 4.2) };
+const orbit = { ...orbitHome, targetRadius: orbitHome.radius, vx: 0, vy: 0, drag: null, returning: false, resumeAt: 0, lastTime: performance.now() };
+const dream = { amount: 0, twist: 0, energy: 0, phase: 0 };
+const dreamStatus = document.getElementById("dreamStatus");
+const zoomLabel = document.getElementById("viewZoom");
+const clampPitch = value => Math.max(0.12, Math.min(1.42, value));
+function endOrbitDrag(e = {}) {
+  if (!orbit.drag || (e.pointerId !== undefined && e.pointerId !== orbit.drag.id)) return;
+  const id = orbit.drag.id;
+  if (e.type !== "pointerup" || performance.now() - orbit.drag.time > 100) orbit.vx = orbit.vy = 0;
+  orbit.drag = null;
+  orbit.resumeAt = performance.now() + 1600;
+  if (canvas.hasPointerCapture(id)) canvas.releasePointerCapture(id);
+  canvas.style.cursor = "grab";
+}
+function resetCamera() {
+  endOrbitDrag();
+  orbit.vx = orbit.vy = 0;
+  dream.energy = 0;
+  orbit.yaw = Math.atan2(Math.sin(orbit.yaw), Math.cos(orbit.yaw));
+  orbit.returning = true;
+  orbit.targetRadius = orbitHome.radius;
+  orbit.resumeAt = performance.now() + 1600;
+}
+canvas.addEventListener("pointerdown", e => {
+  if (e.button !== 0 || orbit.drag) return;
+  e.preventDefault();
+  orbit.returning = false;
+  orbit.vx = orbit.vy = 0;
+  orbit.drag = { id: e.pointerId, x: e.clientX, y: e.clientY, time: performance.now(), started: performance.now(), startX: e.clientX, startY: e.clientY, moved: false };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.style.cursor = "grabbing";
+});
+canvas.addEventListener("pointermove", e => {
+  const d = orbit.drag;
+  if (!d || e.pointerId !== d.id) return;
+  if (!d.moved && Math.hypot(e.clientX - d.startX, e.clientY - d.startY) < 7) return;
+  d.moved = true;
+  const now = performance.now(), dt = Math.max(0.008, (now - d.time) / 1000);
+  const dx = -(e.clientX - d.x) * 0.005;
+  const nextPitch = clampPitch(orbit.pitch + (e.clientY - d.y) * 0.004);
+  orbit.vx = Math.max(-2, Math.min(2, dx / dt));
+  orbit.vy = Math.max(-1.5, Math.min(1.5, (nextPitch - orbit.pitch) / dt));
+  dream.twist = Math.max(-1.4, Math.min(1.4, dream.twist - dx * 1.2 + (e.clientY - d.y) * 0.001));
+  dream.energy = Math.min(1, dream.energy + Math.hypot(e.clientX - d.x, e.clientY - d.y) * 0.008);
+  orbit.yaw += dx;
+  orbit.pitch = nextPitch;
+  Object.assign(d, { x: e.clientX, y: e.clientY, time: now });
+});
+for (const name of ["pointerup", "pointercancel", "lostpointercapture"]) canvas.addEventListener(name, endOrbitDrag);
+window.addEventListener("blur", endOrbitDrag);
+canvas.addEventListener("wheel", e => {
+  e.preventDefault();
+  if (orbit.drag) orbit.drag.moved = true;
+  orbit.returning = false;
+  const unit = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? canvas.clientHeight : 1;
+  orbit.targetRadius = Math.max(2.6, Math.min(9, orbit.targetRadius * Math.exp(Math.max(-150, Math.min(150, e.deltaY * unit)) * 0.002)));
+  orbit.resumeAt = performance.now() + 1600;
+}, { passive: false });
+canvas.addEventListener("dblclick", resetCamera);
+function updateCamera(now) {
+  const dt = Math.max(0, Math.min(0.05, (now - orbit.lastTime) / 1000));
+  orbit.lastTime = now;
+  const holding = orbit.drag && !orbit.drag.moved && now - orbit.drag.started > 350;
+  dream.amount += ((holding ? 1 : 0) - dream.amount) * (1 - Math.exp(-dt * (holding ? 1.1 : 2.2)));
+  dream.twist *= Math.exp(-dt * 1.8);
+  dream.energy *= Math.exp(-dt * 2.0);
+  if (!paused) dream.phase += dt * dream.amount * 12;
+  compUniforms.uDreamPhase.value = dream.phase;
+  compUniforms.uGestureTwist.value = dream.twist;
+  compUniforms.uWarpAmt.value = Math.min(0.35, params.warpAmt + dream.amount * 0.065 + dream.energy * 0.085);
+  dreamStatus.textContent = holding ? "进入梦境 · 松开缓缓退回" : orbit.drag?.moved ? "搅动漩涡" : dream.amount > 0.08 ? "回到此刻" : "";
+  const smooth = 1 - Math.exp(-8 * dt);
+  if (orbit.returning) {
+    orbit.yaw += (orbitHome.yaw - orbit.yaw) * smooth;
+    orbit.pitch += (orbitHome.pitch - orbit.pitch) * smooth;
+    if (Math.abs(orbit.yaw) + Math.abs(orbit.pitch - orbitHome.pitch) + Math.abs(orbit.radius - orbitHome.radius) < 0.002) {
+      Object.assign(orbit, orbitHome, { returning: false });
+    }
+  } else if (!orbit.drag) {
+    const decay = Math.exp(-6 * dt);
+    orbit.yaw += orbit.vx * (1 - decay) / 6;
+    orbit.pitch = clampPitch(orbit.pitch + orbit.vy * (1 - decay) / 6);
+    orbit.vx *= decay;
+    orbit.vy *= decay;
+  }
+  orbit.radius += (orbit.targetRadius - orbit.radius) * smooth;
+  const viewRadius = Math.max(2.2, orbit.radius * (1 - dream.amount * 0.38));
+  const horizontal = Math.cos(orbit.pitch) * viewRadius;
+  camera.position.set(Math.sin(orbit.yaw) * horizontal, -0.2 + Math.sin(orbit.pitch) * viewRadius, Math.cos(orbit.yaw) * horizontal);
+  camera.lookAt(0, -0.2, 0);
+  zoomLabel.textContent = (orbitHome.radius / viewRadius).toFixed(2) + "×";
+}
+
+// ---------- 面板 ----------
+const SLIDERS = [
+  { group: "床" },
+  { key: "bedSize",     label: "床大小",   min: 0.4, max: 3,   step: 0.02,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bedSpin",     label: "旋转速度", min: 0,   max: 1.5, step: 0.01,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bedTilt",     label: "床面倾角", min: 0, max: 1.2, step: 0.02, fmt: (v) => Math.round(v * 180 / Math.PI) + "°" },
+  { key: "bedBob",      label: "悬浮幅度", min: 0,   max: 0.4, step: 0.01,  fmt: (v) => (+v).toFixed(2) },
+  { key: "pillowFloat", label: "枕头漂浮", min: 0,   max: 0.3, step: 0.01,  fmt: (v) => (+v).toFixed(2) },
+  { key: "duvetFloat",  label: "被子飘动", min: 0,   max: 0.35, step: 0.01, fmt: (v) => (+v).toFixed(2) },
+  { key: "bedBend",     label: "柔性起伏", min: 0,   max: 0.15, step: 0.005, fmt: (v) => (+v).toFixed(3) },
+  { key: "bedBendSpd",  label: "柔性速度", min: 0.1, max: 2,   step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bedTwist",    label: "柔性涡旋", min: 0,   max: 1,   step: 0.02,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bedTwistSpd", label: "涡旋速度", min: 0,   max: 3,   step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { group: "背景" },
+  { key: "bgTint",   label: "染色强度", min: 0,    max: 1,    step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bgScale",  label: "背景缩放", min: 0.4,  max: 3,    step: 0.05,  fmt: (v) => (+v).toFixed(2) + "x" },
+  { key: "bgRot",    label: "背景旋转", min: -1,   max: 1,    step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bgBright", label: "背景亮度", min: 0,    max: 2,    step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { key: "bgSat",    label: "背景饱和度", min: 0,   max: 2,    step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { group: "扭曲" },
+  { key: "warpAmt",  label: "扭曲强度", min: 0,    max: 0.25, step: 0.005, fmt: (v) => (+v).toFixed(3) },
+  { key: "warpSpd",  label: "扭曲速度", min: 0,    max: 3,    step: 0.05,  fmt: (v) => (+v).toFixed(2) },
+  { key: "warpFreq", label: "扭曲频率", min: 0,    max: 40,   step: 1,     fmt: (v) => (+v).toFixed(0) },
+];
+
+const panelBody = document.getElementById("panelBody");
+const sliderEls = {};
+for (const s of SLIDERS) {
+  if (s.group) {
+    const h = document.createElement("div");
+    h.className = "group";
+    h.textContent = s.group;
+    panelBody.appendChild(h);
+    if (s.group === "背景") {
+      const imgs = document.createElement("div");
+      imgs.className = "imgs";
+      for (const [name, gen] of Object.entries(BG_PRESETS)) {
+        const b = document.createElement("button");
+        b.className = "bgbtn" + (name === "漩涡" ? " on" : "");
+        b.textContent = name;
+        b.addEventListener("click", () => {
+          setBgTexture(gen());
+          document.querySelectorAll(".bgbtn").forEach((x) => x.classList.remove("on"));
+          b.classList.add("on");
+        });
+        imgs.appendChild(b);
+      }
+      const up = document.createElement("button");
+      up.className = "bgbtn";
+      up.textContent = "上传…";
+      up.addEventListener("click", () => document.getElementById("bgFile").click());
+      imgs.appendChild(up);
+      panelBody.appendChild(imgs);
+
+      // 四色调色板
+      const palWrap = document.createElement("div");
+      palWrap.className = "palwrap";
+      const modeRow = document.createElement("div");
+      modeRow.className = "imgs";
+      const modeBtns = {};
+      for (const [mode, name] of [[0, "纵向渐变"], [1, "径向圈层"]]) {
+        const mb = document.createElement("button");
+        mb.className = "bgbtn" + (params.palMode === mode ? " on" : "");
+        mb.textContent = name;
+        mb.addEventListener("click", () => {
+          params.palMode = mode;
+          Object.values(modeBtns).forEach((x) => x.classList.remove("on"));
+          mb.classList.add("on");
+          saveParams();
+        });
+        modeBtns[mode] = mb;
+        modeRow.appendChild(mb);
+      }
+      const palRow = document.createElement("div");
+      palRow.className = "palrow";
+      const palInputs = {};
+      for (const k of ["palA", "palB", "palC", "palD"]) {
+        const inp = document.createElement("input");
+        inp.type = "color";
+        inp.value = params[k];
+        inp.addEventListener("input", () => { params[k] = inp.value; saveParams(); });
+        palInputs[k] = inp;
+        palRow.appendChild(inp);
+      }
+      const hint = document.createElement("div");
+      hint.className = "palhint";
+      hint.textContent = "① 顶部/中心 → ④ 底部/外缘";
+      palWrap.appendChild(modeRow);
+      palWrap.appendChild(palRow);
+      palWrap.appendChild(hint);
+      panelBody.appendChild(palWrap);
+      sliderEls.__pal = {
+        inputs: palInputs,
+        sync: () => {
+          for (const k of ["palA", "palB", "palC", "palD"]) palInputs[k].value = params[k];
+          Object.entries(modeBtns).forEach(([m, b]) => b.classList.toggle("on", params.palMode === +m));
+        },
+      };
+    }
+    continue;
+  }
+  const row = document.createElement("div");
+  row.className = "row";
+  row.innerHTML =
+    '<div class="lab"><span>' + s.label + '</span><span class="val"></span></div>' +
+    '<input type="range" min="' + s.min + '" max="' + s.max + '" step="' + s.step + '">';
+  const input = row.querySelector("input");
+  const val = row.querySelector(".val");
+  input.value = params[s.key];
+  val.textContent = s.fmt(params[s.key]);
+  input.addEventListener("input", () => {
+    params[s.key] = +input.value;
+    val.textContent = s.fmt(params[s.key]);
+    saveParams();
+  });
+  sliderEls[s.key] = { input, val, fmt: s.fmt };
+  panelBody.appendChild(row);
+}
+
+document.getElementById("panelReset").addEventListener("click", () => {
+  resetCamera();
+  Object.assign(params, DEFAULTS);
+  for (const s of SLIDERS) {
+    if (!s.key) continue;
+    sliderEls[s.key].input.value = params[s.key];
+    sliderEls[s.key].val.textContent = s.fmt(params[s.key]);
+  }
+  sliderEls.__pal.sync();
+  saveParams();
+});
+
+const panel = document.getElementById("panel");
+document.getElementById("panelToggle").addEventListener("click", () => panel.classList.toggle("hidden"));
+
+// ---------- 渲染循环 ----------
+function applyParams() {
+  twistU.uTwist.value = params.bedTwist;
+  compUniforms.uBgScale.value = params.bgScale;
+  compUniforms.uBgRot.value = params.bgRot;
+  compUniforms.uBgBright.value = params.bgBright;
+  compUniforms.uBgSat.value = params.bgSat;
+  compUniforms.uBgTint.value = params.bgTint;
+  compUniforms.uPalA.value.set(params.palA);
+  compUniforms.uPalB.value.set(params.palB);
+  compUniforms.uPalC.value.set(params.palC);
+  compUniforms.uPalD.value.set(params.palD);
+  compUniforms.uPalMode.value = params.palMode;
+  compUniforms.uWarpAmt.value = params.warpAmt;
+  compUniforms.uWarpSpd.value = params.warpSpd;
+  compUniforms.uWarpFreq.value = params.warpFreq;
+}
+
+function resize() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.max(1, Math.floor(canvas.clientWidth * dpr));
+  const h = Math.max(1, Math.floor(canvas.clientHeight * dpr));
+  if (canvas.width !== w || canvas.height !== h) {
+    renderer.setSize(w, h, false);
+    renderer.getDrawingBufferSize(dbufSize);
+    bedRT.setSize(dbufSize.x, dbufSize.y);
+  }
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize", resize);
+
+let paused = false, t0 = performance.now(), elapsed = 0, lastElapsed = 0;
+let frames = 0, fpsT = performance.now();
+const fpsEl = document.getElementById("fps");
+
+function renderFrame(dt) {
+  resize();
+  applyParams();
+  updateCamera(performance.now());
+
+  // 床水平放置，默认绕世界竖直 Y 轴转动；倾角为 0 时不翻滚。
+  if (bed) {
+    const spinBlend = orbit.drag ? 0 : Math.max(0, Math.min(1, (performance.now() - orbit.resumeAt) / 600));
+    bedState.spin += params.bedSpin * dt * spinBlend;
+    bed.rotation.set(0, 0, 0);
+    bedTilt.rotation.x = params.bedTilt;
+    bedSpinG.rotation.y = bedState.spin;
+    bed.position.set(0, params.bedBob * Math.sin(elapsed * 1.2), 0);
+    bed.scale.setScalar(bedBaseScale * params.bedSize);
+    twistU.uTwist.value = params.bedTwist;
+    twistU.uTwistTime.value = params.bedTwistSpd * elapsed;
+    bendU.uBend.value = params.bedBend;
+    bendU.uBendTime.value = params.bedBendSpd * elapsed;
+    waveU.uWaveAmp.value = params.duvetFloat;
+    waveU.uWaveTime.value = elapsed;
+
+    // 枕头各自漂浮(局部 z = 世界竖直向上; 局部 x/y = 床面水平两轴)
+    pillows.forEach((p, i) => {
+      const ph = i * 1.9;
+      p.position.z = p.userData.bz + params.pillowFloat * (0.5 + 0.5 * Math.sin(elapsed * 1.3 + ph));
+      p.position.x = p.userData.bx + params.pillowFloat * 0.35 * Math.sin(elapsed * 0.8 + ph * 2.1);
+      p.position.y = p.userData.by + params.pillowFloat * 0.3 * Math.cos(elapsed * 0.66 + ph * 1.4);
+      p.rotation.x = p.userData.brx + params.pillowFloat * 2.2 * Math.sin(elapsed * 0.75 + ph * 1.7);
+      p.rotation.y = p.userData.bry + params.pillowFloat * 2.8 * Math.sin(elapsed * 0.5 + ph);
+      p.rotation.z = p.userData.brz + params.pillowFloat * 2.5 * Math.sin(elapsed * 0.9 + ph);
+    });
+    // 被子: 脱离床面飘起 + 摇曳 + 顶点波浪(波浪在着色器里)
+    if (duvetMesh) {
+      const d = duvetMesh;
+      d.position.z = d.userData.bz + params.duvetFloat * (0.4 + 0.25 * Math.sin(elapsed * 0.6));
+      d.position.x = d.userData.bx + params.duvetFloat * 0.3 * Math.sin(elapsed * 0.5 + 2.0);
+      d.position.y = d.userData.by + params.duvetFloat * 0.22 * Math.cos(elapsed * 0.43);
+      d.rotation.x = d.userData.brx + params.duvetFloat * 1.6 * Math.sin(elapsed * 0.55);
+      d.rotation.z = d.userData.brz + params.duvetFloat * 1.3 * Math.sin(elapsed * 0.42 + 1.2);
+    }
+  }
+
+  // Pass1: 床 → RT
+  renderer.setRenderTarget(bedRT);
+  renderer.setClearColor(0x000000, 0);
+  renderer.clear(true, true, true);
+  renderer.render(scene, camera);
+
+  // Pass2: 漩涡合成 → 屏幕
+  renderer.setRenderTarget(null);
+  renderer.getDrawingBufferSize(dbufSize);
+  compUniforms.iResolution.value.set(dbufSize.x, dbufSize.y, 1);
+  compUniforms.iTime.value = elapsed;
+  renderer.clear(true, true, true);
+  renderer.render(compScene, compCam);
+}
+
+const dbufSize = new THREE.Vector2();
+
+// 手动渲染(测试用)
+window.__render = function (t) {
+  const dt = t - lastElapsed;
+  lastElapsed = t;
+  elapsed = t;
+  renderFrame(dt);
+  return true;
+};
+
+// 读取床渲染目标(测试用): 全帧覆盖率 + 包围盒
+window.__pose = function () {
+  if (!bed) return null;
+  const d = 180 / Math.PI;
+  return {
+    tilt: +(bedTilt.rotation.x * d).toFixed(1),
+    spin: +((bedSpinG.rotation.y * d) % 360).toFixed(1),
+    x: +bed.position.x.toFixed(3), z: +bed.position.z.toFixed(3), y: +bed.position.y.toFixed(3),
+  };
+};
+window.__readRT = function () {
+  const b = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const w = b.x, h = b.y;
+  const buf = new Uint8Array(w * h * 4);
+  renderer.readRenderTargetPixels(bedRT, 0, 0, w, h, buf);
+  let opaque = 0, minX = w, maxX = -1, minY = h, maxY = -1, topLum = 0, topN = 0, botLum = 0, botN = 0;
+  let sx = 0, sy = 0, allLum = 0;
+  for (let y = 0; y < h; y += 2) for (let x = 0; x < w; x += 2) {
+    const i = (y * w + x) * 4;
+    if (buf[i + 3] > 40) {
+      opaque++;
+      sx += x; sy += y;
+      const lv = 0.299 * buf[i] + 0.587 * buf[i + 1] + 0.114 * buf[i + 2];
+      allLum += lv;
+      if (x < minX) minX = x; if (x > maxX) maxX = x;
+      if (y < minY) minY = y; if (y > maxY) maxY = y;
+      const lum = 0.299 * buf[i] + 0.587 * buf[i + 1] + 0.114 * buf[i + 2];
+      if (y < h / 2) { topLum += lum; topN++; } else { botLum += lum; botN++; }
+    }
+  }
+  return {
+    coveragePct: Math.round(100 * opaque / ((w / 2) * (h / 2))),
+    bboxW: maxX >= 0 ? maxX - minX : 0,
+    bboxH: maxY >= 0 ? maxY - minY : 0,
+    cx: opaque ? Math.round(sx / opaque) : -1,
+    cy: opaque ? Math.round(sy / opaque) : -1,
+    meanLum: opaque ? Math.round(allLum / opaque) : -1,
+    topLum: topN ? Math.round(topLum / topN) : -1,
+    bottomLum: botN ? Math.round(botLum / botN) : -1,
+  };
+};
+
+function frame(now) {
+  const dt = paused ? 0 : (now - t0) / 1000 - lastElapsed;
+  if (!paused) {
+    elapsed = (now - t0) / 1000;
+    lastElapsed = elapsed;
+  }
+  renderFrame(dt);
+  frames++;
+  if (now - fpsT >= 500) {
+    fpsEl.textContent = Math.round(frames * 1000 / (now - fpsT)) + " fps" + (paused ? " (已暂停)" : "");
+    frames = 0; fpsT = now;
+  }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+window.addEventListener("keydown", (e) => {
+  if (e.code === "Space") {
+    e.preventDefault();
+    if (!paused) paused = true;
+    else { t0 = performance.now() - elapsed * 1000; paused = false; }
+  } else if (e.code === "KeyR") { resetCamera(); t0 = performance.now(); elapsed = 0; lastElapsed = 0; }
+  else if (e.code === "KeyF") {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else document.documentElement.requestFullscreen();
+  }
+});
+</script>
+</body>
+</html>
