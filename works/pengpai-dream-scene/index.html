@@ -93,14 +93,15 @@ uniform float uAlpha;      // 火焰浓淡
 uniform float uChurn;      // 翻涌速度
 uniform float uCorridor;   // 走廊薄纱密度
 uniform float uPocket;     // 床周围口袋挖空强度
+uniform float uPart;       // 拖拽拨开火焰 0..1（交互驱动）
 uniform float uHueShift;   // 色相偏移（半圈）
+uniform float uBright;     // 画面整体亮度
 
-// —— 梦境色卡（sRGB 取色后转线性）——
-const vec3 CARD_CREAM  = vec3(0.98, 0.85, 0.70);  // 奶白
-const vec3 CARD_INDIGO = vec3(0.025, 0.040, 0.24);// 靛蓝
-const vec3 CARD_CORAL  = vec3(1.00, 0.38, 0.46);  // 浅粉珊瑚
-const vec3 CARD_PEACH  = vec3(1.00, 0.55, 0.35);  // 蜜桃
-const vec3 CARD_PINK   = vec3(1.00, 0.45, 0.72);  // 粉
+// —— 火焰色卡（深红系，线性空间）——
+const vec3 FLAME_DEEP  = vec3(0.10, 0.010, 0.018); // 暗红（稀薄边缘）
+const vec3 FLAME_RED   = vec3(0.42, 0.035, 0.045); // 深红（云海主体）
+const vec3 FLAME_EMBER = vec3(0.85, 0.22, 0.060);  // 余烬橙红（高密度核心）
+const vec3 FLAME_WINE  = vec3(0.20, 0.015, 0.030); // 酒红（低处深处）
 
 float vhash(vec3 p){
   return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453123);
@@ -129,33 +130,57 @@ vec3 hueShift(vec3 c, float h){
   return c*ca + cross(k, c)*sin(h * 6.2831853) + k*dot(k, c)*(1.0 - ca);
 }
 
-// 向上翻涌的湍流火焰海：海平面随噪声起伏（原创密度场）
+float fbm3(vec3 p){
+  float s = 0.0, a = 0.5;
+  for (int i = 0; i < 3; i++){
+    s += a * vnoise(p);
+    p = p * 2.03 + vec3(1.7, -0.6, 0.9);
+    a *= 0.5;
+  }
+  return s;
+}
+// 向上翻涌的湍流火焰海：双层噪声叠加翻滚更剧烈，海平面抬高让火焰铺满画面（原创密度场）
 float flameDensity(vec3 p, float gt){
-  vec3 q = vec3(p.x, p.y - gt * 0.8, p.z);
-  float n = fbm(q * 1.1);
-  float level = 0.15 + 0.9 * (n - 0.5);                 // 起伏的海平面
-  float sea  = smoothstep(level + 0.55, level - 0.45, p.y);
+  vec3 q = vec3(p.x, p.y - gt * 0.95, p.z);
+  float n = fbm(q * 1.25);
+  n += 0.34 * fbm3(q * 2.7 + vec3(0.0, -gt * 1.5, gt * 0.35)); // 快速上冒的细节层
+  n *= 0.76;
+  float level = 1.35 + 1.45 * (n - 0.5);                // 抬高的海平面
+  float sea  = smoothstep(level + 0.65, level - 0.55, p.y);
   float fade = smoothstep(-1.6, -0.4, p.y);
-  return clamp(sea * (0.4 + 0.6 * n) * 1.25 * fade, 0.0, 1.0);
+  return clamp(sea * (0.35 + 0.65 * n) * 1.35 * fade, 0.0, 1.0);
 }
 
 vec4 map(vec3 p, vec3 ro, float gt){
   vec3 r = p;
+  vec3 pb = vec3(0.0, 0.5, 0.0);
   float den = flameDensity(p, gt);
 
-  // 床周围口袋：让白床在云雾中保持可见
-  den *= 1.0 - uPocket * (1.0 - smoothstep(1.6, 2.9, length(r - vec3(0.0, 0.5, 0.0))));
+  // 不规则调制噪声：让挖空边缘参差起伏，而不是规整的圆
+  float wobP = vnoise(r * 1.35 + vec3(0.0, -gt * 0.55, 3.1));
 
-  // 视线走廊：相机→床方向保留一层薄纱，床若隐若现
-  vec3 pb = vec3(0.0, 0.5, 0.0);
+  // 床周围口袋：静止时轻微（半透出床轮廓），拖拽时增强并随噪声抖动
+  float pk = mix(0.30, uPocket, uPart) * (0.35 + 0.85 * wobP);
+  den *= 1.0 - pk * (1.0 - smoothstep(1.6, 2.9, length(r - pb)));
+
+  // 视线走廊 + 拨开：静止时几乎不挖（火焰铺满画面），拖拽时向两旁不规则分开
   vec3 ab = pb - ro;
   float th = clamp(dot(r - ro, ab) / dot(ab, ab), 0.0, 1.0);
   float dLine = length(r - (ro + th * ab));
-  den *= uCorridor + (1.0 - uCorridor) * smoothstep(0.6, 1.9, dLine);
+  float cFloor = mix(0.55, 0.02, uPart);
+  float ang = atan(r.z - pb.z, r.x - pb.x);
+  float wobA = vnoise(vec3(cos(ang) * 1.7, sin(ang) * 1.7, (r.y - gt * 0.8) * 0.55)
+              + vec3(0.0, 0.0, gt * 0.30));
+  float cR = mix(0.45, 2.00, uPart) * (0.45 + 0.75 * wobA); // 挖空半径随角度/高度起伏
+  den *= cFloor + (1.0 - cFloor) * smoothstep(cR - 0.7, cR + 0.25, dLine);
+  float dSide = (dLine - cR - 0.25) / 0.5;
+  den += uPart * 0.50 * (0.3 + 0.9 * wobP) * exp(-dSide * dSide); // 分开的火舌边缘参差
+  den = clamp(den, 0.0, 1.0);
 
-  vec3 col = 1.15 * mix(CARD_INDIGO, CARD_CREAM, den);
-  col += 0.04 * sin(0.6 * p.yzx + gt);
-  col = mix(CARD_CORAL, col, clamp((r.y + 0.6) / 1.8, 0.0, 1.0));
+  vec3 col = mix(FLAME_DEEP, FLAME_RED, den);
+  col = mix(col, FLAME_EMBER, smoothstep(0.72, 1.0, den));
+  col += 0.05 * sin(0.6 * p.yzx + gt);
+  col = mix(FLAME_WINE, col, clamp((r.y + 0.6) / 1.9, 0.0, 1.0));
   return vec4(col, den);
 }
 
@@ -163,7 +188,7 @@ vec3 marchFlames(vec3 ro, vec3 rd, vec3 bg, float gt){
   vec4 acc = vec4(0.0);
   float dith = fract(52.9829189 * fract(0.06711056 * gl_FragCoord.x + 0.00583715 * gl_FragCoord.y));
   float t = 0.06 * dith;
-  for (int i = 0; i < 96; i++){
+  for (int i = 0; i < 80; i++){
     if (acc.a > 0.99) break;
     vec4 s = map(ro + t * rd, ro, gt);
     s.a *= uAlpha;
@@ -171,7 +196,8 @@ vec3 marchFlames(vec3 ro, vec3 rd, vec3 bg, float gt){
     acc += s * (1.0 - acc.a);
     t += 0.06;
   }
-  return mix(bg, acc.rgb / max(acc.a, 0.001), acc.a);
+  // 火焰保持轻微通透（×0.90）：浓处也隐约透出背景与床的轮廓
+  return mix(bg, acc.rgb / max(acc.a, 0.001), acc.a * 0.90);
 }
 
 void main(){
@@ -180,7 +206,7 @@ void main(){
 
   // 相机：环绕 + 可升降（与 JS 侧 syncCamera 完全同步）
   float an = -0.07 * iTime + 3.0 * uMoX;
-  vec3 ro = vec3(cos(an) * 4.2, 1.6 + uCamY, sin(an) * 4.2);
+  vec3 ro = vec3(cos(an) * 4.2, 2.4 + uCamY, sin(an) * 4.2);
   vec3 ta = vec3(0.0, 0.4, 0.0);
   vec3 ww = normalize(ta - ro);
   vec3 uu = normalize(cross(vec3(0.0, 1.0, 0.0), ww));
@@ -191,9 +217,10 @@ void main(){
 
   vec3 col = marchFlames(ro, rd, bg, iTime * uChurn);
 
-  // 暗角 + 色相 + 伽马
+  // 暗角 + 亮度 + 色相 + 伽马
   float vig = smoothstep(1.4, 0.45, length(q - 0.5) * 1.35);
   col *= 0.55 + 0.45 * vig;
+  col *= uBright;
   col = hueShift(col, uHueShift);
   col = clamp(col, 0.0, 1.0);
   outColor = vec4(pow(col, vec3(1.0 / 2.2)), 1.0);
@@ -215,9 +242,11 @@ void main() {
   float sa = uRes.x / uRes.y;
   if (sa > uImgAspect) uv.y *= uImgAspect / sa; else uv.x *= sa / uImgAspect;
   vec3 c = texture(uBg, uv + 0.5).rgb;
-  c = pow(c, vec3(uBrightExp));      // 提亮暗部
-  c *= vec3(0.94, 1.02, uBlueMul);   // 深蓝色相
-  c += vec3(0.035, 0.060, 0.125);    // 抬高整体亮度与深蓝底
+  c = pow(c, vec3(uBrightExp));      // 压暗：值越大画面越深（>1 为夜间压暗）
+  // 黑蓝夜色：按亮度约束色相，强压红绿、提蓝
+  float lum = dot(c, vec3(0.299, 0.587, 0.114));
+  c = mix(vec3(lum), c, 0.40) * vec3(0.42, 0.64, uBlueMul);
+  c += vec3(0.003, 0.008, uBlueAdd); // 极低深蓝底，保住夜晚感
   outColor = vec4(c, 1.0);
 }`;
 
@@ -268,9 +297,9 @@ const bgMat = new THREE.ShaderMaterial({
     uBg: { value: bgTex },
     uRes: { value: new THREE.Vector2(1, 1) },
     uImgAspect: { value: BG_IMG_W / BG_IMG_H },
-    uBrightExp: { value: 0.65 },
-    uBlueMul: { value: 1.22 },
-    uBlueAdd: { value: 0.125 },
+    uBrightExp: { value: 0.95 },
+    uBlueMul: { value: 1.55 },
+    uBlueAdd: { value: 0.018 },
   },
   vertexShader: bgVert, fragmentShader: bgFrag,
   depthTest: false, depthWrite: false,
@@ -281,12 +310,13 @@ bgQuad.frustumCulled = false;
 sceneBase.add(bgQuad);
 
 // ---- 通道一：灯光（色卡：暖光 + 靛蓝夜空环境光） ----
-sceneBase.add(new THREE.AmbientLight(0xbfd0ff, 1.2));
-sceneBase.add(new THREE.HemisphereLight(0x35418f, 0xffc9b8, 1.5));
-const warm = new THREE.PointLight(0xffc9ad, 7, 0, 2);
+// r160 物理光照点光按距离平方衰减，强度按衰减补偿保证床面受光充足
+sceneBase.add(new THREE.AmbientLight(0xbfd0ff, 1.6));
+sceneBase.add(new THREE.HemisphereLight(0x35418f, 0xffc9b8, 1.8));
+const warm = new THREE.PointLight(0xffc9ad, 22, 0, 2);
 warm.position.set(0.4, -0.3, 3.2);
 sceneBase.add(warm);
-const cool = new THREE.DirectionalLight(0x93b4ff, 2.6);
+const cool = new THREE.DirectionalLight(0x93b4ff, 3.5);
 cool.position.set(-2.5, 4, -1.5);
 sceneBase.add(cool);
 
@@ -310,6 +340,7 @@ function pickPillow(cx, cy) {
 new GLTFLoader().load('assets/newbed.glb',
   (gltf) => {
     const bed = gltf.scene;
+    bed.rotation.x = -Math.PI / 2; // 模型原始朝向沿 +Y 站立：放倒 90° 使床面朝上
     const box = new THREE.Box3().setFromObject(bed);
     const size = box.getSize(new THREE.Vector3());
     const s = 1.75 / Math.max(size.x, size.y, size.z);
@@ -355,11 +386,13 @@ const flameMat = new THREE.ShaderMaterial({
     uScene: { value: rt.texture },
     uMoX: { value: 0 },
     uCamY: { value: 0 },
-    uAlpha: { value: 0.46 },
-    uChurn: { value: 1.2 },
+    uAlpha: { value: 0.40 },
+    uChurn: { value: 2.0 },
     uCorridor: { value: 0.04 },
-    uPocket: { value: 0.85 },
+    uPocket: { value: 0.40 },
+    uPart: { value: 0 },
     uHueShift: { value: 0 },
+    uBright: { value: 1.25 },
   },
   vertexShader: flameVert, fragmentShader: flameFrag,
   depthTest: false, depthWrite: false,
@@ -371,8 +404,11 @@ flameScene.add(flameTri);
 // ---- 交互：拖拽调整视角（松手保持角度，缓慢漂移继续）；单击枕头漂浮 / 单击火焰换色相 ----
 let dragging = false;
 let downCX = 0, downCY = 0, lastCY = 0;
-let camY = 0;      // 垂直拖拽的相机升降量
+let camY = 1.4;      // 垂直拖拽的相机升降量（默认略抬高俯瞰平放的床）
 let viewMoX = 0;   // 拖拽后的视角方位分量（0..1，松手保持）
+let part = 0;      // 火焰拨开程度（拖拽时→1，松手缓慢回落）
+window.__getPart = () => part;
+window.__getPivot = () => bedPivot ? {rx:+bedPivot.rotation.x.toFixed(3), ry:+bedPivot.rotation.y.toFixed(3), rz:+bedPivot.rotation.z.toFixed(3), y:+bedPivot.position.y.toFixed(2)} : null;
 canvas.addEventListener('pointerdown', e => {
   dragging = true;
   try { canvas.setPointerCapture(e.pointerId); } catch (err) {}
@@ -425,7 +461,7 @@ const _ro = new THREE.Vector3(), _ww = new THREE.Vector3(), _uu = new THREE.Vect
       _vv = new THREE.Vector3(), _ta = new THREE.Vector3(0, 0.4, 0);
 function syncCamera(t, moX) {
   const an = -0.07 * t + 3.0 * moX;
-  _ro.set(Math.cos(an) * 4.2, 1.6 + camY, Math.sin(an) * 4.2);
+  _ro.set(Math.cos(an) * 4.2, 2.4 + camY, Math.sin(an) * 4.2);
   _ww.copy(_ta).sub(_ro).normalize();
   _uu.set(0, 1, 0).cross(_ww).normalize();
   _vv.copy(_ww).cross(_uu);
@@ -436,10 +472,10 @@ function syncCamera(t, moX) {
 
 // ---- 参数滑杆面板 ----
 const FX_DEFAULTS = {
-  alpha: 0.46, churn: 1.2, corridor: 0.04, pocket: 0.85, hue: 0,
+  alpha: 0.40, churn: 2.0, corridor: 0.04, pocket: 0.40, hue: 0,
   bedSize: 1.0, bedHeight: 0.15, tumbleAmp: 1.0, tumbleSpeed: 1.0, bedSat: 0.45, pillowFloat: 0.55,
-  bgBright: 0.65, bgBlue: 1.22, bgFloor: 0.125,
-  warmI: 7, coolI: 2.6,
+  bgBright: 0.95, bgBlue: 1.55, bgFloor: 0.018,
+  warmI: 22, coolI: 3.5, bright: 1.25,
 };
 const FX = { ...FX_DEFAULTS };
 
@@ -456,6 +492,7 @@ function applyFX(key) {
     case 'bgBright': bgMat.uniforms.uBrightExp.value = v; break;
     case 'bgBlue': bgMat.uniforms.uBlueMul.value = v; break;
     case 'bgFloor': bgMat.uniforms.uBlueAdd.value = v; break;
+    case 'bright': flameMat.uniforms.uBright.value = v; break;
     case 'warmI': warm.intensity = v; break;
     case 'coolI': cool.intensity = v; break;
     // bedHeight / tumbleAmp / tumbleSpeed 在 frame() 里实时读取
@@ -493,9 +530,10 @@ const SLIDER_DEFS = [
   ['tumbleAmp', '翻转幅度', 0, 2, 0.05],
   ['tumbleSpeed', '翻转速度', 0, 2, 0.05],
   ['背景', null],
-  ['bgBright', '背景亮度', 0.40, 1.00, 0.01],
-  ['bgBlue', '背景蓝调', 0.80, 1.60, 0.01],
+  ['bgBright', '背景亮度', 0.60, 1.80, 0.01],
+  ['bgBlue', '背景蓝调', 0.80, 2.00, 0.01],
   ['bgFloor', '深蓝底', 0, 0.30, 0.005],
+  ['bright', '画面亮度', 0.60, 2.00, 0.01],
   ['灯光', null],
   ['warmI', '暖光强度', 0, 40, 1],
   ['coolI', '蓝光强度', 0, 6, 0.1],
@@ -560,12 +598,13 @@ function frame(now) {
   syncCamera(t, viewMoX);
 
   // 床的不规则翻转：多个不成谐波关系的正弦叠加
+  // 床平放模式：四脚着地水平悬浮，仅绕竖轴缓慢旋转 + 轻微摇摆与浮沉（本地修改）
   if (bedPivot) {
     const ts = t * FX.tumbleSpeed;
-    bedPivot.rotation.y = ts * 0.10 + 0.5 * Math.sin(ts * 0.043);
-    bedPivot.rotation.x = FX.tumbleAmp * (0.45 * Math.sin(ts * 0.171 + 1.2) + 0.18 * Math.sin(ts * 0.071));
-    bedPivot.rotation.z = FX.tumbleAmp * (0.30 * Math.sin(ts * 0.117 + 0.5) + 0.12 * Math.sin(ts * 0.049 + 2.0));
-    bedPivot.position.y = FX.bedHeight + 0.12 * Math.sin(ts * 0.19);
+    bedPivot.rotation.y = ts * 0.12;
+    bedPivot.rotation.x = FX.tumbleAmp * 0.10 * Math.sin(ts * 0.171 + 1.2);
+    bedPivot.rotation.z = FX.tumbleAmp * 0.06 * Math.sin(ts * 0.117 + 0.5);
+    bedPivot.position.y = FX.bedHeight + part * 0.55 + 0.10 * Math.sin(ts * 0.19); // 静止时下沉入火焰，拖拽时升起
   }
 
   // 枕头漂浮动画：指数平滑趋近目标高度，漂浮时叠加轻微浮动
@@ -584,6 +623,8 @@ function frame(now) {
   flameMat.uniforms.iTime.value = t;
   flameMat.uniforms.uCamY.value = camY;
   flameMat.uniforms.uMoX.value = viewMoX;
+  part += ((dragging ? 1 : 0) - part) * (dragging ? 0.12 : 0.010); // 拨开：快起慢落，散开状态多停留
+  flameMat.uniforms.uPart.value = part;
   renderer.setRenderTarget(null);
   renderer.render(flameScene, dummyCam);
 
@@ -600,6 +641,8 @@ function frame(now) {
 requestAnimationFrame(frame);
 window.__step = frame; // 手动渲染单帧（后台标签页 RAF 可能被节流）
 window.__dbg.ready = true; // 模块执行完成标志
+window.__dbg.g = () => ({ renderer, sceneBase, cam, rt, flameScene, dummyCam });
+window.__dbg.renderStats = () => { const r = renderer.info.render; const progs = (renderer.info.programs||[]).map(p => ({name: p.name, diag: p.diagnostics ? JSON.stringify(p.diagnostics).slice(0,300) : null})); return {calls: r.calls, triangles: r.triangles, progs}; };
 window.__dbg.g = () => ({ renderer, sceneBase, cam, rt, flameScene, dummyCam });
 window.__dbg.readPixel = (x, y) => {
   const gl = renderer.getContext();
