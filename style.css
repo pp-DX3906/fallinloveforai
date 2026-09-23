@@ -1,40 +1,248 @@
-*{box-sizing:border-box}html,body{margin:0;height:100%}body{overflow:hidden;background:#141d33;color:#f2eefb;font:16px/1.65 system-ui,-apple-system,"PingFang SC",sans-serif}a{color:inherit;text-decoration:none}
-/* ---------- 星空背景（明度压暗） ---------- */
-.cover{position:fixed;inset:0;overflow:hidden}
-.sky{position:absolute;inset:-4%;background:url(assets/bg-stars.jpg) center 30%/cover no-repeat}
-.sky-dim{position:absolute;inset:0;background:linear-gradient(180deg,rgba(13,21,44,.52) 0%,rgba(13,21,44,.42) 45%,rgba(10,17,36,.62) 100%),radial-gradient(120% 90% at 50% 42%,rgba(13,21,44,0) 55%,rgba(8,13,28,.5) 100%)}
-body::before{content:"";position:absolute;inset:0;z-index:6;pointer-events:none;opacity:.05;background-size:220px 220px;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
-#stars{position:absolute;inset:0;width:100%;height:100%}
-/* ---------- 顶栏 ---------- */
-.topbar{position:absolute;top:0;left:0;right:0;z-index:8;min-height:86px;padding:0 5%;display:flex;align-items:center;justify-content:space-between;gap:20px}
-.brand{font-size:21px;font-weight:700;letter-spacing:-.5px;text-shadow:0 2px 14px rgba(8,13,28,.8)}
-.brand span{display:block;font-size:11px;font-weight:400;letter-spacing:3px;color:#c9d3ef}
-.edition{font-size:11px;letter-spacing:3px;color:#aeb9dc}
-/* ---------- 标题（sleepwalking 字体效果） ---------- */
-.title{position:absolute;z-index:7;left:50%;top:9%;transform:translateX(-50%);text-align:center;width:min(92vw,880px)}
-.eyebrow{font-size:11px;letter-spacing:5px;color:#b9c4e6;text-shadow:0 1px 10px rgba(8,13,28,.9)}
-.title .en{margin:6px 0 2px;font-family:"Cherry Cream Soda",cursive;font-weight:400;font-size:clamp(46px,7vw,92px);line-height:1.05;letter-spacing:1px;background:linear-gradient(180deg,#fdfbf2 12%,#e7e3d4 45%,#b9b4a8 78%,#e8e4d6 100%);-webkit-background-clip:text;background-clip:text;color:transparent;filter:drop-shadow(0 2px 0 rgba(52,54,74,.55)) drop-shadow(0 14px 26px rgba(5,9,22,.55))}
-.title .zh{font-family:"ZCOOL KuaiLe",system-ui;font-size:clamp(18px,2.2vw,26px);letter-spacing:14px;text-indent:14px;color:#e6e9fb;text-shadow:0 2px 14px rgba(8,13,28,.85)}
-.title .zh::before,.title .zh::after{content:"✦";font-size:.62em;color:#d9c0f3;vertical-align:.35em;letter-spacing:0;text-indent:0;opacity:.9}
-.title .zh::before{margin-right:14px}.title .zh::after{margin-left:14px}
-/* ---------- 中央旋转的床 ---------- */
-.bed-stage{position:absolute;z-index:5;left:50%;top:52%;width:min(36vw,470px);transform:translate(-50%,-50%);pointer-events:none}
-.bed{display:block;width:100%;filter:drop-shadow(0 26px 34px rgba(5,9,22,.5));transform-origin:50% 50%}
-.bed-shadow{width:72%;height:34px;margin:-6px auto 0;background:radial-gradient(50% 50% at 50% 50%,rgba(5,9,22,.5),rgba(5,9,22,0) 70%)}
-/* ---------- 漂浮素材 / 可点击入口 ---------- */
-.floater,.entry{position:absolute;z-index:5;left:calc(var(--x)*1%);top:calc(var(--y)*1%);transform:translate(-50%,-50%);will-change:transform}
-.entry img,.floater img,.floater{filter:drop-shadow(0 18px 26px rgba(5,9,22,.42))}
-.entry{display:flex;flex-direction:column;align-items:center;gap:6px}
-.entry img{transition:transform .35s ease}
-.entry:hover img{transform:scale(1.07)}
-.entry:focus-visible{outline:2px solid #d9c0f3;outline-offset:8px;border-radius:12px}
-.chip{display:flex;align-items:baseline;gap:8px;padding:7px 16px;border-radius:30px;background:rgba(16,25,50,.55);border:1px solid rgba(217,192,243,.35);backdrop-filter:blur(6px);font-size:13px;letter-spacing:1.5px;color:#eef;white-space:nowrap}
-.chip b{font-weight:400;color:#d9c0f3;font-size:11px;letter-spacing:2px}
-.chip i{font-style:normal;font-size:11px;color:#aab4d8;letter-spacing:2px}
-.entry:hover .chip{background:rgba(217,192,243,.92);border-color:transparent}
-.entry:hover .chip,.entry:hover .chip b,.entry:hover .chip i{color:#232a52}
-/* ---------- 底部 ---------- */
-.credits{position:absolute;z-index:8;left:0;right:0;bottom:0;padding:18px 5%;display:flex;justify-content:space-between;gap:20px;font-size:12px;letter-spacing:2px;color:#b9c4e6;text-shadow:0 1px 10px rgba(8,13,28,.9)}
-/* ---------- 小屏 ---------- */
-@media(max-width:760px){.edition{display:none}.title{top:12%}.bed-stage{width:62vw;top:56%}.entry[style*="--x:19"]{--x:22 !important;--y:26 !important}.entry[style*="--x:80"]{--x:78;--y:24}.entry[style*="--x:76"]{--x:70;--y:80}.credits{flex-direction:column;gap:6px;align-items:center;text-align:center}}
-@media(prefers-reduced-motion:reduce){.floater,.entry,.bed{animation:none !important;transition:none}}
+:root {
+  color-scheme: dark;
+  --cream: #fffaf0;
+}
+
+* { box-sizing: border-box; }
+html, body { width: 100%; height: 100%; margin: 0; }
+body {
+  overflow: hidden;
+  color: var(--cream);
+  font-family: ui-rounded, "SF Pro Rounded", "PingFang SC", system-ui, sans-serif;
+  background: #526ee0;
+}
+a { color: inherit; text-decoration: none; }
+img { display: block; user-select: none; -webkit-user-drag: none; }
+
+.dream-cover {
+  position: fixed;
+  inset: 0;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 540px;
+  background:
+    linear-gradient(180deg, rgba(27, 38, 129, .08), transparent 36%),
+    url("assets/dream-palette.png") center / cover no-repeat;
+}
+
+.dream-cover::before {
+  content: "";
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(255,255,255,.34) 0 1px, transparent 2px),
+    radial-gradient(circle at 72% 18%, rgba(255,255,255,.48) 0 1.5px, transparent 2.5px),
+    radial-gradient(circle at 43% 34%, rgba(255,246,194,.34) 0 1px, transparent 2px),
+    radial-gradient(circle at 88% 42%, rgba(255,255,255,.4) 0 1px, transparent 2px);
+  background-size: 86px 86px, 141px 141px, 109px 109px, 173px 173px;
+  mix-blend-mode: screen;
+  opacity: .9;
+}
+
+.dream-cover::after {
+  content: "";
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 45%, transparent 44%, rgba(36, 34, 115, .18) 100%);
+}
+
+.aurora {
+  position: absolute;
+  z-index: 0;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 10% 42%, rgba(107, 242, 255, .28), transparent 28%),
+    radial-gradient(circle at 88% 34%, rgba(255, 159, 223, .35), transparent 30%),
+    radial-gradient(circle at 50% 66%, rgba(255, 246, 206, .3), transparent 32%);
+  filter: blur(20px);
+}
+
+#stars { position: absolute; z-index: 2; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+
+.topbar {
+  position: absolute;
+  z-index: 30;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding: clamp(18px, 3vw, 34px) clamp(22px, 4vw, 56px);
+  text-shadow: 0 2px 14px rgba(37, 42, 118, .35);
+}
+.brand strong { display: block; font-size: clamp(16px, 1.7vw, 23px); letter-spacing: -.04em; }
+.brand span, .edition { font-size: 10px; letter-spacing: .25em; opacity: .82; }
+.edition { padding-top: 5px; }
+
+.sleepwalking {
+  position: absolute;
+  z-index: 15;
+  top: 7.5%;
+  left: 50%;
+  width: min(60vw, 820px);
+  height: auto;
+  transform: translateX(-50%);
+  filter: drop-shadow(0 12px 20px rgba(53, 54, 129, .22));
+  pointer-events: none;
+}
+
+.dream-object, .decor, .picture-star {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  will-change: transform;
+}
+.dream-object { z-index: 12; }
+.dream-object img, .decor, .picture-star {
+  width: 100%;
+  height: auto;
+  filter: drop-shadow(0 18px 22px rgba(49, 44, 110, .2));
+}
+.dream-object img { transition: transform .28s ease, filter .28s ease; }
+.dream-object:hover img, .dream-object:focus-visible img {
+  transform: translateY(-6px) scale(1.035);
+  filter: drop-shadow(0 0 16px rgba(255,255,255,.7)) drop-shadow(0 22px 25px rgba(49,44,110,.24));
+}
+.dream-object:focus-visible { outline: 3px solid rgba(255,255,255,.9); outline-offset: 10px; border-radius: 32px; }
+
+.bed-link { left: 50%; top: 55%; width: min(39vw, 570px); }
+.bed-link img { filter: drop-shadow(0 24px 30px rgba(65, 48, 117, .25)); }
+.moon { z-index: 9; left: 81%; top: 34%; width: clamp(120px, 15vw, 220px); }
+.sheep-link { left: 16%; top: 67%; width: clamp(130px, 16vw, 230px); }
+.cloud { z-index: 7; left: 15%; top: 32%; width: clamp(145px, 19vw, 280px); }
+.pillow-link { left: 83%; top: 69%; width: clamp(150px, 19vw, 275px); transform: translate(-50%, -50%) rotate(8deg); }
+
+.object-label {
+  position: absolute;
+  left: 50%;
+  top: calc(100% - 7px);
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  transform: translateX(-50%);
+  padding: 7px 12px;
+  border: 1px solid rgba(255,255,255,.58);
+  border-radius: 999px;
+  color: #3a4388;
+  background: rgba(255,255,255,.56);
+  box-shadow: 0 7px 20px rgba(54,52,126,.12);
+  backdrop-filter: blur(9px);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .13em;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity .25s ease, transform .25s ease;
+}
+.object-label b { color: #ef7fa8; }
+.dream-object:hover .object-label, .dream-object:focus-visible .object-label {
+  opacity: 1;
+  transform: translate(-50%, 5px);
+}
+
+.star-field { position: absolute; z-index: 10; inset: 0; pointer-events: none; }
+.picture-star { filter: drop-shadow(0 0 12px rgba(255,255,255,.4)); }
+.star-1 { left: 29%; top: 30%; width: clamp(42px, 5.2vw, 78px); transform: translate(-50%,-50%) rotate(-12deg); }
+.star-2 { left: 68%; top: 29%; width: clamp(30px, 3.8vw, 58px); transform: translate(-50%,-50%) rotate(11deg); }
+.star-3 { left: 9%; top: 47%; width: clamp(36px, 4.5vw, 68px); transform: translate(-50%,-50%) rotate(-9deg); }
+.star-4 { left: 90%; top: 49%; width: clamp(43px, 5.5vw, 82px); transform: translate(-50%,-50%) rotate(14deg); }
+.star-5 { left: 34%; top: 77%; width: clamp(28px, 3.5vw, 54px); transform: translate(-50%,-50%) rotate(-15deg); }
+.star-6 { left: 67%; top: 75%; width: clamp(34px, 4.4vw, 65px); transform: translate(-50%,-50%) rotate(8deg); }
+.star-7 { left: 47%; top: 31%; width: clamp(21px, 2.7vw, 42px); transform: translate(-50%,-50%) rotate(6deg); }
+.star-8 { left: 5%; top: 24%; width: clamp(19px, 2.2vw, 36px); transform: translate(-50%,-50%) rotate(-17deg); }
+.star-9 { left: 22%; top: 19%; width: clamp(27px, 3vw, 48px); transform: translate(-50%,-50%) rotate(13deg); }
+.star-10 { left: 76%; top: 18%; width: clamp(20px, 2.3vw, 38px); transform: translate(-50%,-50%) rotate(-8deg); }
+.star-11 { left: 95%; top: 27%; width: clamp(25px, 3.2vw, 50px); transform: translate(-50%,-50%) rotate(16deg); }
+.star-12 { left: 4%; top: 71%; width: clamp(30px, 3.7vw, 58px); transform: translate(-50%,-50%) rotate(9deg); }
+.star-13 { left: 26%; top: 85%; width: clamp(18px, 2.1vw, 34px); transform: translate(-50%,-50%) rotate(-11deg); }
+.star-14 { left: 73%; top: 86%; width: clamp(24px, 2.8vw, 45px); transform: translate(-50%,-50%) rotate(18deg); }
+.star-15 { left: 96%; top: 79%; width: clamp(17px, 2vw, 32px); transform: translate(-50%,-50%) rotate(-6deg); }
+.star-16 { left: 39%; top: 25%; width: clamp(16px, 1.8vw, 29px); transform: translate(-50%,-50%) rotate(15deg); }
+.star-17 { left: 60%; top: 83%; width: clamp(20px, 2.4vw, 39px); transform: translate(-50%,-50%) rotate(-13deg); }
+
+.planet {
+  position: absolute;
+  z-index: 3;
+  left: 50%;
+  bottom: -32%;
+  width: 125vw;
+  height: 53%;
+  transform: translateX(-50%);
+  border-radius: 50% 50% 0 0 / 72% 72% 0 0;
+  background:
+    radial-gradient(circle at 31% 22%, rgba(255,255,255,.84) 0 2%, transparent 8%),
+    radial-gradient(circle at 67% 15%, rgba(255,241,207,.72) 0 4%, transparent 13%),
+    linear-gradient(180deg, #ffd9d8 0%, #ffc9d0 19%, #ffb299 48%, #ff756e 100%);
+  box-shadow: 0 -10px 40px rgba(255, 227, 249, .8), 0 -2px 0 rgba(255,255,255,.76);
+  overflow: hidden;
+}
+.planet-glow { position: absolute; inset: 8% 17% auto; height: 18%; border-radius: 50%; background: rgba(255,255,255,.46); filter: blur(15px); }
+.planet-ring { position: absolute; display: block; border: 3px solid rgba(255,255,255,.32); border-radius: 50%; transform: rotate(-5deg); }
+.ring-one { width: 38%; height: 15%; left: 9%; top: 23%; }
+.ring-two { width: 28%; height: 11%; right: 12%; top: 17%; }
+
+.hint {
+  position: absolute;
+  z-index: 30;
+  left: 50%;
+  bottom: 18px;
+  margin: 0;
+  transform: translateX(-50%);
+  color: rgba(87, 65, 130, .86);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .dream-cover { min-height: 500px; }
+  .edition { display: none; }
+  .topbar { padding: 16px 18px; }
+  .brand span { font-size: 9px; }
+  .sleepwalking { top: 10%; width: min(94vw, 620px); }
+  .bed-link { top: 54%; width: min(76vw, 470px); }
+  .cloud { left: 14%; top: 35%; width: 31vw; }
+  .moon { left: 85%; top: 35%; width: 24vw; }
+  .sheep-link { left: 16%; top: 72%; width: 25vw; }
+  .pillow-link { left: 84%; top: 72%; width: 29vw; }
+  .star-1 { left: 31%; top: 35%; }
+  .star-2 { left: 68%; top: 34%; }
+  .star-3 { left: 7%; top: 53%; }
+  .star-4 { left: 94%; top: 53%; }
+  .star-5 { left: 37%; top: 79%; }
+  .star-6 { left: 65%; top: 79%; }
+  .star-7 { display: none; }
+  .star-8 { left: 6%; top: 24%; }
+  .star-9 { left: 25%; top: 26%; }
+  .star-10 { left: 75%; top: 25%; }
+  .star-11 { left: 96%; top: 25%; }
+  .star-12 { left: 5%; top: 82%; }
+  .star-13 { left: 29%; top: 86%; }
+  .star-14 { left: 73%; top: 87%; }
+  .star-15 { left: 96%; top: 82%; }
+  .star-16 { display: none; }
+  .star-17 { left: 59%; top: 84%; }
+  .planet { bottom: -29%; width: 155vw; height: 47%; }
+  .hint { bottom: 12px; width: 100%; padding: 0 18px; font-size: 10px; letter-spacing: .1em; white-space: normal; }
+  .object-label { display: none; }
+}
+
+@media (max-height: 650px) and (min-width: 761px) {
+  .sleepwalking { top: 5%; width: min(49vw, 680px); }
+  .bed-link { top: 54%; width: min(34vw, 460px); }
+  .moon { top: 36%; }
+  .cloud { top: 35%; }
+  .sheep-link, .pillow-link { top: 70%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dream-object, .decor, .picture-star { animation: none !important; }
+  .dream-object img, .object-label { transition: none; }
+}

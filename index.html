@@ -1,46 +1,74 @@
 <!doctype html>
-<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>FallinloveforAI · 如梦之梦</title><meta name="description" content="如梦之梦 · As If in a Dream —— Bed Vortex / Dream Orbit / Drifting Sleep，三场可以进入的交互梦境。"><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232A3B5E'/%3E%3Cpath d='M8 9h16v4H12v4h9v4h-9v5H8z' fill='%23d9c0f3'/%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cherry+Cream+Soda&family=ZCOOL+KuaiLe&display=swap"><link rel="stylesheet" href="style.css"></head>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>FallinloveforAI · SleepWalking</title>
+  <meta name="description" content="SleepWalking —— 三场可以进入的交互梦境。">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='9' fill='%235b67d8'/%3E%3Cpath d='M16 5l2.8 6.4 7 .7-5.3 4.6 1.6 6.8-6.1-3.6-6.1 3.6 1.6-6.8-5.3-4.6 7-.7z' fill='%23fff6df'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
 <body>
-<div class="cover">
-  <div class="sky"></div>
-  <div class="sky-dim"></div>
-  <canvas id="stars"></canvas>
+  <main class="dream-cover">
+    <div class="aurora" aria-hidden="true"></div>
+    <canvas id="stars" aria-hidden="true"></canvas>
 
-  <header class="topbar">
-    <a class="brand" href="./">FallinloveforAI<span>交互梦境展</span></a>
-    <span class="edition">THREE WORLDS / ONE DREAM</span>
-  </header>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="返回封面">
+        <strong>FallinloveforAI</strong>
+        <span>交互梦境展 · 2026</span>
+      </a>
+      <span class="edition">THREE DREAMS / ONE NIGHT</span>
+    </header>
 
-  <div class="title">
-    <div class="eyebrow">A COLLECTIVE EXHIBITION · 2026</div>
-    <h1 class="en" aria-label="As If in a Dream">As If in a Dream</h1>
-    <div class="zh">如梦之梦</div>
-  </div>
+    <img class="sleepwalking" src="assets/sleepwalking.png" alt="SleepWalking">
 
-  <div class="bed-stage" id="bedStage">
-    <img class="bed" src="assets/bed.png" alt="缓缓旋转的床" draggable="false">
-    <div class="bed-shadow"></div>
-  </div>
+    <a class="dream-object bed-link" href="works/homer-dreams-webgl/index.html" aria-label="点击床进入 Dream Orbit：漂浮梦境">
+      <img src="assets/bed.png" alt="一张黄色的梦中床">
+      <span class="object-label"><b>02</b> DREAM ORBIT</span>
+    </a>
 
-  <a class="entry" data-work="bed" href="works/bedvortex/index.html" style="--x:19;--y:37">
-    <img src="assets/pillow.png" alt="" draggable="false"><span class="chip"><b>01</b> Bed Vortex<i>床与漩涡</i></span>
-  </a>
-  <a class="entry" data-work="homer" href="works/homer-dreams-webgl/index.html" style="--x:80;--y:30">
-    <img src="assets/moon.png" alt="" draggable="false"><span class="chip"><b>02</b> Dream Orbit<i>漂浮梦境</i></span>
-  </a>
-  <a class="entry" data-work="pengpai" href="works/pengpai-dream-scene/index.html" style="--x:76;--y:76">
-    <img src="assets/sheep.png" alt="" draggable="false"><span class="chip"><b>03</b> Drifting Sleep<i>火焰云海</i></span>
-  </a>
+    <a class="dream-object pillow-link" href="works/bedvortex/index.html" aria-label="点击枕头进入 Bed Vortex：床与漩涡">
+      <img src="assets/pillow.png" alt="白色枕头">
+      <span class="object-label"><b>01</b> BED VORTEX</span>
+    </a>
 
-  <img class="floater" src="assets/cloud.png" style="--x:12;--y:68" alt="" draggable="false">
-  <img class="floater" src="assets/star-silver.png" style="--x:38;--y:16" alt="" draggable="false">
-  <img class="floater" src="assets/star-glitter.png" style="--x:63;--y:85" alt="" draggable="false">
-  <img class="floater" src="assets/star-pink.png" style="--x:89;--y:57" alt="" draggable="false">
+    <a class="dream-object sheep-link" href="works/pengpai-dream-scene/index.html" aria-label="进入 Drifting Sleep：火焰云海">
+      <img src="assets/sheep.png" alt="白色小羊">
+      <span class="object-label"><b>03</b> DRIFTING SLEEP</span>
+    </a>
 
-  <footer class="credits">
-    <span>点击漂浮的素材，进入三场梦境</span>
-    <span>Bed Vortex · Dream Orbit · Drifting Sleep — 三个人的想象，在这里相遇</span>
-  </footer>
-</div>
-<script src="app.js"></script>
-</body></html>
+    <img class="decor cloud" src="assets/cloud.png" alt="">
+    <img class="decor moon" src="assets/moon.png" alt="">
+
+    <div class="star-field" aria-hidden="true">
+      <img class="picture-star star-1" src="assets/star-glitter.png" alt="">
+      <img class="picture-star star-2" src="assets/star-silver.png" alt="">
+      <img class="picture-star star-3" src="assets/star-pink.png" alt="">
+      <img class="picture-star star-4" src="assets/star-glitter.png" alt="">
+      <img class="picture-star star-5" src="assets/star-silver.png" alt="">
+      <img class="picture-star star-6" src="assets/star-pink.png" alt="">
+      <img class="picture-star star-7" src="assets/star-glitter.png" alt="">
+      <img class="picture-star star-8" src="assets/star-mint.png" alt="">
+      <img class="picture-star star-9" src="assets/star-opal.png" alt="">
+      <img class="picture-star star-10" src="assets/star-confetti.png" alt="">
+      <img class="picture-star star-11" src="assets/star-blush.png" alt="">
+      <img class="picture-star star-12" src="assets/star-yellow.png" alt="">
+      <img class="picture-star star-13" src="assets/star-mint.png" alt="">
+      <img class="picture-star star-14" src="assets/star-opal.png" alt="">
+      <img class="picture-star star-15" src="assets/star-confetti.png" alt="">
+      <img class="picture-star star-16" src="assets/star-blush.png" alt="">
+      <img class="picture-star star-17" src="assets/star-yellow.png" alt="">
+    </div>
+
+    <div class="planet" aria-hidden="true">
+      <span class="planet-glow"></span>
+      <span class="planet-ring ring-one"></span>
+      <span class="planet-ring ring-two"></span>
+    </div>
+
+    <p class="hint">点击床、枕头或小羊，进入三场梦境</p>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
