@@ -22,8 +22,6 @@
     text-shadow: 0 1px 2px rgba(0,0,0,.8);
     user-select: none; pointer-events: none;
   }
-  #hud a { color: rgba(255,255,255,.9); }
-  #hud .title { font-size: 14px; font-weight: 700; letter-spacing: .5px; }
   #fps {
     position: absolute; right: 14px; top: 10px;
     color: rgba(255,255,255,.65); font-size: 12px;
@@ -110,27 +108,44 @@
     color: #ff6b6b; font-size: 12px; white-space: pre-wrap;
     text-shadow: 0 1px 2px rgba(0,0,0,.9);
   }
+  #dreamTransition {
+    --entry: 0;
+    position: fixed; inset: 0; z-index: 20; pointer-events: none;
+    display: grid; place-items: center;
+    background: #020718;
+    opacity: clamp(0, calc((var(--entry) - .80) * 5), 1);
+  }
+  #dreamTransition::before {
+    content: ""; width: 10vmin; height: 10vmin; border-radius: 50%;
+    border: 1px solid rgba(205,225,255,.8);
+    box-shadow: 0 0 36px rgba(132,177,255,.7), inset 0 0 30px rgba(255,255,255,.35);
+    transform: scale(calc(1 + var(--entry) * 16));
+    opacity: calc(1 - var(--entry));
+  }
+  #dreamTransition.entering { opacity: 1; transition: opacity .55s ease-in; }
+  body.dream-entering #hud,
+  body.dream-entering #fps,
+  body.dream-entering #panel,
+  body.dream-entering #panelToggle { opacity: 0; transition: opacity .35s; }
 </style>
 </head>
 <body>
 <canvas id="glcanvas"></canvas>
 
 <div id="hud">
-  <div class="title">BedVortex · 床与漩涡</div>
-  <div>基于 <a href="https://www.shadertoy.com/view/Msl3WM" target="_blank">NyanCatHypnotic</a> · <a href="flock.html">羊群版 →</a></div>
-  <div>按住不动进入梦境 · 拖动搅动漩涡 · 双指上下滑动推拉镜头 · 双击复位</div>
-  <div>视图 <span id="viewZoom">1.00×</span> · 空格 暂停 · R 重置 · F 全屏</div>
+  <div>长按约 4 秒坠入梦境 · 拖动搅动漩涡 · 双指上下滑动推拉镜头 · 双击复位</div>
 </div>
 <div id="dreamStatus" style="position:absolute;top:24px;left:50%;transform:translateX(-50%);color:#fff;font:13px sans-serif;pointer-events:none;text-shadow:0 2px 8px #000"></div>
 <div id="fps"></div>
 <input type="file" id="bgFile" accept="image/*" hidden>
-<button id="panelToggle">⚙ 参数</button>
-<div id="panel">
+<button id="panelToggle" aria-expanded="false">⚙ 参数</button>
+<div id="panel" class="hidden">
   <div class="p-head"><span>参数</span><button id="panelReset">重置</button></div>
   <div id="panelBody"></div>
 </div>
 <div id="loading">加载床模型中…</div>
 <div id="err"></div>
+<div id="dreamTransition" aria-hidden="true"></div>
 
 <!-- 漩涡合成着色器(three ShaderMaterial, GLSL1) -->
 <script type="text/plain" id="composite">
@@ -238,13 +253,22 @@ const DEFAULTS = {
   bedSize: 1.1, bedSpin: 0.5, bedTilt: 0, bedBob: 0,
   bedTwist: 0, bedTwistSpd: 0.8, pillowFloat: 0.08, duvetFloat: 0.16,
   bedBend: 0.05, bedBendSpd: 0.4,
-  bgScale: 1, bgRot: 0, bgBright: 1, bgSat: 1,
+  bgScale: 1, bgRot: 0, bgBright: 1, bgSat: 0.45,
   palA: "#4a63e8", palB: "#7a52e8", palC: "#b04be8", palD: "#e84bc0",
-  palMode: 0, bgTint: 0.85,
+  palMode: 0, bgTint: 0.2,
   warpAmt: 0.05, warpSpd: 1, warpFreq: 15,
 };
 const params = { ...DEFAULTS };
-try { Object.assign(params, JSON.parse(localStorage.getItem("bedParams9") || "{}")); } catch (e) { /* 忽略损坏存档 */ }
+try {
+  const stored = JSON.parse(localStorage.getItem("bedParams9") || "{}");
+  if (stored.__defaultsVersion !== 2) {
+    stored.bgTint = DEFAULTS.bgTint;
+    stored.bgSat = DEFAULTS.bgSat;
+    stored.__defaultsVersion = 2;
+  }
+  Object.assign(params, stored);
+} catch (e) { /* 忽略损坏存档 */ }
+params.__defaultsVersion = 2;
 function saveParams() {
   try { localStorage.setItem("bedParams9", JSON.stringify(params)); } catch (e) { /* 隐私模式 */ }
 }
@@ -634,9 +658,9 @@ compScene.add(new THREE.Mesh(triGeom, compMat));
 // ---------- 摄影机环绕 ----------
 const orbitHome = { yaw: 0, pitch: Math.atan2(3.2, 4.2), radius: Math.hypot(3.2, 4.2) };
 const orbit = { ...orbitHome, targetRadius: orbitHome.radius, vx: 0, vy: 0, drag: null, returning: false, resumeAt: 0, lastTime: performance.now() };
-const dream = { amount: 0, twist: 0, energy: 0, phase: 0 };
+const dream = { amount: 0, entry: 0, twist: 0, energy: 0, phase: 0, committed: false };
 const dreamStatus = document.getElementById("dreamStatus");
-const zoomLabel = document.getElementById("viewZoom");
+const dreamTransition = document.getElementById("dreamTransition");
 const clampPitch = value => Math.max(0.12, Math.min(1.42, value));
 function endOrbitDrag(e = {}) {
   if (!orbit.drag || (e.pointerId !== undefined && e.pointerId !== orbit.drag.id)) return;
@@ -648,8 +672,10 @@ function endOrbitDrag(e = {}) {
   canvas.style.cursor = "grab";
 }
 function resetCamera() {
+  if (dream.committed) return;
   endOrbitDrag();
   orbit.vx = orbit.vy = 0;
+  dream.entry = dream.amount = 0;
   dream.energy = 0;
   orbit.yaw = Math.atan2(Math.sin(orbit.yaw), Math.cos(orbit.yaw));
   orbit.returning = true;
@@ -657,7 +683,7 @@ function resetCamera() {
   orbit.resumeAt = performance.now() + 1600;
 }
 canvas.addEventListener("pointerdown", e => {
-  if (e.button !== 0 || orbit.drag) return;
+  if (e.button !== 0 || orbit.drag || dream.committed) return;
   e.preventDefault();
   orbit.returning = false;
   orbit.vx = orbit.vy = 0;
@@ -696,14 +722,28 @@ function updateCamera(now) {
   const dt = Math.max(0, Math.min(0.05, (now - orbit.lastTime) / 1000));
   orbit.lastTime = now;
   const holding = orbit.drag && !orbit.drag.moved && now - orbit.drag.started > 350;
-  dream.amount += ((holding ? 1 : 0) - dream.amount) * (1 - Math.exp(-dt * (holding ? 1.1 : 2.2)));
+  const heldFor = holding ? Math.max(0, now - orbit.drag.started - 350) : 0;
+  if (holding) dream.entry = Math.max(dream.entry, Math.min(1, heldFor / 3600));
+  else if (!dream.committed) dream.entry *= Math.exp(-dt * 2.4);
+  dream.amount = dream.entry * dream.entry * (3 - 2 * dream.entry);
   dream.twist *= Math.exp(-dt * 1.8);
   dream.energy *= Math.exp(-dt * 2.0);
-  if (!paused) dream.phase += dt * dream.amount * 12;
+  if (!paused) dream.phase += dt * (dream.amount * 12 + dream.amount * dream.amount * 42);
   compUniforms.uDreamPhase.value = dream.phase;
   compUniforms.uGestureTwist.value = dream.twist;
-  compUniforms.uWarpAmt.value = Math.min(0.35, params.warpAmt + dream.amount * 0.065 + dream.energy * 0.085);
-  dreamStatus.textContent = holding ? "进入梦境 · 松开缓缓退回" : orbit.drag?.moved ? "搅动漩涡" : dream.amount > 0.08 ? "回到此刻" : "";
+  compUniforms.uBgScale.value = params.bgScale * (1 - dream.amount * .38);
+  compUniforms.uWarpAmt.value = Math.min(0.48, params.warpAmt + dream.amount * 0.20 + dream.energy * 0.085);
+  dreamTransition.style.setProperty("--entry", dream.amount.toFixed(3));
+  dreamStatus.textContent = holding
+    ? (dream.entry < .08 ? "保持按住 · 梦境正在靠近" : "坠入梦境 " + Math.round(dream.entry * 100) + "%")
+    : orbit.drag?.moved ? "搅动漩涡" : dream.amount > 0.08 ? "梦境渐渐远去" : "";
+  if (dream.entry >= 1 && !dream.committed) {
+    dream.committed = true;
+    document.body.classList.add("dream-entering");
+    dreamTransition.classList.add("entering");
+    dreamStatus.textContent = "正在坠入梦境";
+    setTimeout(() => { window.location.href = "dream.html"; }, 650);
+  }
   const smooth = 1 - Math.exp(-8 * dt);
   if (orbit.returning) {
     orbit.yaw += (orbitHome.yaw - orbit.yaw) * smooth;
@@ -719,11 +759,10 @@ function updateCamera(now) {
     orbit.vy *= decay;
   }
   orbit.radius += (orbit.targetRadius - orbit.radius) * smooth;
-  const viewRadius = Math.max(2.2, orbit.radius * (1 - dream.amount * 0.38));
+  const viewRadius = Math.max(0.68, orbit.radius * (1 - dream.amount * 0.87));
   const horizontal = Math.cos(orbit.pitch) * viewRadius;
   camera.position.set(Math.sin(orbit.yaw) * horizontal, -0.2 + Math.sin(orbit.pitch) * viewRadius, Math.cos(orbit.yaw) * horizontal);
   camera.lookAt(0, -0.2, 0);
-  zoomLabel.textContent = (orbitHome.radius / viewRadius).toFixed(2) + "×";
 }
 
 // ---------- 面板 ----------
@@ -858,7 +897,11 @@ document.getElementById("panelReset").addEventListener("click", () => {
 });
 
 const panel = document.getElementById("panel");
-document.getElementById("panelToggle").addEventListener("click", () => panel.classList.toggle("hidden"));
+const panelToggle = document.getElementById("panelToggle");
+panelToggle.addEventListener("click", () => {
+  const closed = panel.classList.toggle("hidden");
+  panelToggle.setAttribute("aria-expanded", String(!closed));
+});
 
 // ---------- 渲染循环 ----------
 function applyParams() {
@@ -903,18 +946,18 @@ function renderFrame(dt) {
 
   // 床水平放置，默认绕世界竖直 Y 轴转动；倾角为 0 时不翻滚。
   if (bed) {
-    const spinBlend = orbit.drag ? 0 : Math.max(0, Math.min(1, (performance.now() - orbit.resumeAt) / 600));
-    bedState.spin += params.bedSpin * dt * spinBlend;
+    const spinBlend = orbit.drag?.moved ? 0 : dream.amount > 0 ? 1 : Math.max(0, Math.min(1, (performance.now() - orbit.resumeAt) / 600));
+    bedState.spin += (params.bedSpin + dream.amount * 1.8) * dt * spinBlend;
     bed.rotation.set(0, 0, 0);
     bedTilt.rotation.x = params.bedTilt;
     bedSpinG.rotation.y = bedState.spin;
     bed.position.set(0, params.bedBob * Math.sin(elapsed * 1.2), 0);
     bed.scale.setScalar(bedBaseScale * params.bedSize);
-    twistU.uTwist.value = params.bedTwist;
-    twistU.uTwistTime.value = params.bedTwistSpd * elapsed;
-    bendU.uBend.value = params.bedBend;
+    twistU.uTwist.value = params.bedTwist + dream.amount * 1.35;
+    twistU.uTwistTime.value = params.bedTwistSpd * elapsed + dream.phase * 0.32;
+    bendU.uBend.value = Math.min(0.28, params.bedBend + dream.amount * 0.16);
     bendU.uBendTime.value = params.bedBendSpd * elapsed;
-    waveU.uWaveAmp.value = params.duvetFloat;
+    waveU.uWaveAmp.value = params.duvetFloat + dream.amount * 0.16;
     waveU.uWaveTime.value = elapsed;
 
     // 枕头各自漂浮(局部 z = 世界竖直向上; 局部 x/y = 床面水平两轴)

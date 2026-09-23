@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BedVortex · 梦境页风格样稿</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #05070b; }
+  body { color: rgba(255,255,255,.86); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .scene { position: fixed; inset: 0; isolation: isolate; background: #07101e; }
+  .scene::before {
+    content: ""; position: absolute; inset: -7%; z-index: -3;
+    background: url("background-stars.png") center/cover no-repeat;
+    filter: saturate(.45) brightness(.7) contrast(1.08);
+    transform: scale(1.08) rotate(-2deg);
+  }
+  .color-wash {
+    position: absolute; inset: -18%; z-index: -2; pointer-events: none;
+    background:
+      radial-gradient(ellipse at 48% 50%, transparent 0 16%, rgba(59,114,171,.25) 25%, transparent 43%),
+      conic-gradient(from 36deg at 50% 51%, rgba(67,104,211,.3), rgba(169,74,166,.24), rgba(202,116,83,.16), rgba(51,157,147,.24), rgba(67,104,211,.3));
+    filter: blur(28px) saturate(.65);
+    opacity: .72;
+    transform: scale(1.15) rotate(-8deg);
+    mix-blend-mode: screen;
+  }
+  .tunnel {
+    position: absolute; left: 50%; top: 51%; z-index: -1; width: 84vmin; aspect-ratio: 1;
+    transform: translate(-50%,-50%) scaleY(.72) rotate(7deg); border-radius: 50%;
+    background:
+      radial-gradient(circle, rgba(4,8,18,.7) 0 11%, transparent 12% 21%, rgba(139,168,222,.08) 22% 25%, transparent 26% 38%, rgba(198,139,186,.09) 39% 43%, transparent 44% 59%, rgba(92,168,174,.09) 60% 65%, transparent 66%);
+    box-shadow: inset 0 0 90px rgba(87,135,214,.18), 0 0 120px rgba(31,77,139,.2);
+    filter: blur(2px);
+  }
+  .grain { position: absolute; inset: 0; pointer-events: none; opacity: .14; mix-blend-mode: soft-light; background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.88' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E"); }
+  .sheep {
+    position: absolute; width: 40px; height: 32px; background: url("sheep.png") 0 0/256px 32px no-repeat;
+    image-rendering: pixelated; transform: translate(-50%,-50%) scale(var(--s,2));
+    filter: saturate(.55) contrast(1.08) drop-shadow(3px 1px 0 rgba(89,131,206,.48)) drop-shadow(-2px 0 0 rgba(188,91,177,.28));
+  }
+  .s1 { left: 20%; top: 25%; --s: 1.8; background-position: 0 0; }
+  .s2 { left: 38%; top: 19%; --s: 1.55; background-position: -40px 0; }
+  .s3 { left: 60%; top: 24%; --s: 1.8; background-position: -80px 0; }
+  .s4 { left: 76%; top: 38%; --s: 2.05; background-position: -120px 0; }
+  .s5 { left: 70%; top: 66%; --s: 2.35; background-position: -160px 0; }
+  .s6 { left: 47%; top: 73%; --s: 2.45; background-position: -200px 0; }
+  .s7 { left: 25%; top: 65%; --s: 2.25; background-position: -80px 0; }
+  .s8 { left: 14%; top: 47%; --s: 2; background-position: -160px 0; }
+  .s9 { left: 50%; top: 46%; --s: 2.1; background-position: -40px 0; }
+  .progress { position: fixed; right: 14px; top: 10px; color: rgba(255,255,255,.65); font-size: 12px; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .progress b { color: rgba(255,255,255,.9); font-weight: 600; }
+  .tutorial { position: fixed; left: 14px; bottom: 12px; color: rgba(255,255,255,.75); font-size: 12px; line-height: 1.7; text-shadow: 0 1px 2px rgba(0,0,0,.8); }
+  .back { position: fixed; right: 14px; bottom: 12px; padding: 6px 12px; border: 1px solid rgba(255,255,255,.22); border-radius: 8px; color: rgba(255,255,255,.85); background: rgba(20,20,24,.72); font: 12px/1 inherit; backdrop-filter: blur(4px); }
+  .mockup { position: fixed; left: 14px; top: 12px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.13); border-radius: 6px; color: rgba(255,255,255,.5); background: rgba(10,10,14,.35); font-size: 10px; letter-spacing: .08em; }
+  @media (max-width: 620px) {
+    .tutorial { right: 14px; bottom: 54px; }
+    .sheep { --s: 1.35; }
+  }
+</style>
+</head>
+<body>
+<main class="scene" aria-label="梦境页面统一风格静态样稿">
+  <div class="color-wash"></div>
+  <div class="tunnel"></div>
+  <div class="grain"></div>
+  <i class="sheep s1"></i><i class="sheep s2"></i><i class="sheep s3"></i>
+  <i class="sheep s4"></i><i class="sheep s5"></i><i class="sheep s6"></i>
+  <i class="sheep s7"></i><i class="sheep s8"></i><i class="sheep s9"></i>
+</main>
+<div class="mockup">STATIC STYLE PREVIEW</div>
+<div class="progress">困意 <b>63%</b></div>
+<div class="tutorial">点击召唤小羊 · 按住拖动连续产生羊群 · 困意 80% 后会发生变化</div>
+<span class="back">← 返回漩涡</span>
+</body>
+</html>
